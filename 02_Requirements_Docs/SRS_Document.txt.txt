@@ -1,0 +1,61 @@
+SOFTWARE REQUIREMENTS SPECIFICATION (SRS)
+
+Project:
+Accounting Web & Mobile Application
+
+1. Purpose
+
+The purpose of this system is to provide a digital platform for businesses to manage accounting operations including invoicing, expenses, inventory, and financial reporting with GST compliance.
+
+2. Scope
+
+The system includes a web application and a mobile application that allow users to manage financial transactions, generate invoices, track expenses, manage inventory, and view financial reports in real time.
+
+3. User Types
+
+- Admin: Manages system settings and users
+- Accountant: Handles financial transactions and reports
+- Business Owner: Views reports and summaries
+
+4. Functional Requirements
+
+4.1 User Management
+- System should allow user registration and login
+- System should support role-based access
+
+4.2 Customer & Vendor Management
+- System should allow adding and managing customers and vendors
+
+4.3 Sales Module
+- System should generate invoices and quotations
+
+4.4 Purchase Module
+- System should manage purchase orders and bills
+
+4.5 Expense Management
+- System should record and categorize expenses
+
+4.6 Inventory Management
+- System should track stock levels
+
+4.7 Reports
+- System should generate financial reports
+
+5. Non-Functional Requirements
+
+- The system should be secure and protect financial data
+- The system should support multiple users simultaneously
+- The system should provide fast response times
+- The system should be easy to use
+
+6. Assumptions & Dependencies
+
+- Users have internet access for web and mobile usage
+- Users understand basic accounting concepts
+- System depends on accurate user input for correct reports
+
+7. Constraints
+
+- Must comply with Indian GST rules
+- Must support web and Android platforms
+- Limited time (3 months) for full development

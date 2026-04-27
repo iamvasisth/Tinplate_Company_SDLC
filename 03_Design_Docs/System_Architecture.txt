@@ -1,0 +1,37 @@
+SYSTEM ARCHITECTURE
+
+The system will follow a client-server architecture:
+
+- Web Application (Frontend)
+- Mobile Application (Frontend)
+- Backend Server (API Layer)
+- Database (Data Storage)
+
+Frontend Layer:
+
+- Web Application built using React or Angular
+- Mobile Application built using Flutter or React Native
+- Responsible for user interface and user interactions
+
+Backend Layer:
+
+- Built using Node.js / Django / Laravel
+- Provides REST API for communication
+- Handles business logic and data processing
+
+Database Layer:
+
+- Uses MySQL or PostgreSQL
+- Stores users, transactions, invoices, and reports data
+
+Communication Flow:
+
+- Frontend sends requests to Backend via REST APIs
+- Backend processes requests and interacts with Database
+- Response is sent back to Frontend for display
+
+Security:
+
+- JWT-based authentication
+- HTTPS for secure communication
+- Role-based access control

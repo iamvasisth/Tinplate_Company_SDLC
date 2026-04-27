@@ -1,0 +1,47 @@
+PROJECT CHARTER
+
+Project Name:
+Accounting Web & Mobile Application
+
+Client:
+Tinplate Computer Training Center, Jamshedpur
+
+Project Duration:
+3 Months (65 Working Days)
+
+Project Objective:
+
+To develop a web and mobile-based accounting system that allows businesses to manage financial transactions, generate invoices, track expenses, and produce real-time financial reports with GST compliance.
+
+Project Scope (In-Scope):
+
+- User authentication and role-based access
+- Customer and vendor management
+- Sales module (invoices, quotations)
+- Purchase module (bills, vendor payments)
+- Expense tracking
+- Inventory management
+- GST and tax calculations
+- Financial reports (P&L, Balance Sheet)
+- Mobile app for basic operations
+
+Project Scope (Out-of-Scope):
+
+- No advanced AI-based financial predictions
+- No international tax system support (only Indian GST)
+- No blockchain or cryptocurrency features
+- No offline-first functionality in initial version
+
+High-Level Risks:
+
+- Complex financial calculations may lead to incorrect reports if not handled properly
+- Data security risks (financial data is sensitive)
+- Performance issues with large datasets
+- Integration challenges between web and mobile systems
+
+Success Criteria:
+
+- Users can create and manage invoices without errors
+- Financial reports generate accurate results
+- System supports multiple users and organizations
+- Mobile and web data remain synchronized in real-time

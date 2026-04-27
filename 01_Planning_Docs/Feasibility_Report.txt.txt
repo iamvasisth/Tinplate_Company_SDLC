@@ -1,0 +1,27 @@
+FEASIBILITY REPORT
+
+Project:
+Accounting Web & Mobile Application
+
+Technical Feasibility:
+
+The system requires development of a full-stack architecture including a web frontend, backend API, database, and a mobile application.
+
+The technologies such as React/Angular (frontend), Node.js/Django/Laravel (backend), and MySQL/PostgreSQL (database) are widely used and well-supported.
+
+Cloud hosting and modern frameworks make this project technically feasible within the given timeline, provided proper architecture and modular development are followed.
+
+Operational Feasibility:
+
+The system is intended for small and medium businesses and is designed to be user-friendly. Basic training will enable users to manage daily accounting tasks efficiently.
+
+The availability of mobile access further improves usability and adoption.
+
+Legal & Compliance Feasibility:
+
+The system will follow Indian accounting standards and GST regulations. Proper handling of financial data and user authentication will be implemented to ensure compliance with data protection practices.
+
+Conclusion:
+
+The project is feasible with modern web and mobile technologies. Proper planning, modular development, and testing will ensure successful delivery within the timeline.
+

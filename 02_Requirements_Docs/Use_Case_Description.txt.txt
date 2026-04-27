@@ -1,0 +1,39 @@
+USE CASE DESCRIPTION
+
+Project:
+Accounting Web & Mobile Application
+
+Use Case 1: User Login
+
+Actor: User
+
+Description:
+The user logs into the system using valid credentials to access the dashboard.
+
+Use Case 2: Manage Customers/Vendors
+
+Actor: User
+
+Description:
+The user can add, edit, and manage customer and vendor details.
+
+Use Case 2: Manage Customers/Vendors
+
+Actor: User
+
+Description:
+The user can add, edit, and manage customer and vendor details.
+
+Use Case 4: Record Expense
+
+Actor: User
+
+Description:
+The user records business expenses with categories and amounts.
+
+Use Case 5: View Financial Reports
+
+Actor: User
+
+Description:
+The user views financial reports such as Profit & Loss and Balance Sheet.

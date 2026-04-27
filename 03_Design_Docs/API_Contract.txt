@@ -1,0 +1,40 @@
+API CONTRACT
+
+All APIs will follow REST principles and use JSON format for request and response.
+
+POST /api/login
+
+Request:
+{
+  "email": "user@example.com",
+  "password": "password"
+}
+
+Response:
+{
+  "token": "jwt_token",
+  "role": "Admin"
+}
+
+POST /api/invoices
+
+Request:
+{
+  "customer_id": 1,
+  "total_amount": 1000,
+  "gst_amount": 180
+}
+
+Response:
+{
+  "message": "Invoice created successfully"
+}
+
+GET /api/reports
+
+Response:
+{
+  "profit": 5000,
+  "expenses": 2000,
+  "balance": 3000
+}

@@ -1,0 +1,37 @@
+WIREFRAMES
+
+Project:
+Accounting Web & Mobile Application
+
+Screen 1: Login Screen
+
+- Username input
+- Password input
+- Login button
+
+Screen 2: Dashboard
+
+- Summary of total sales
+- Summary of expenses
+- Recent transactions
+- Quick action buttons (Create Invoice, Add Expense)
+
+Screen 3: Invoice Creation
+
+- Customer selection
+- Item list with quantity and price
+- GST calculation
+- Save and send invoice button
+
+Screen 4: Expense Entry
+
+- Expense category
+- Amount input
+- Date selection
+- Save button
+
+Screen 5: Reports Screen
+
+- Profit & Loss view
+- Balance Sheet view
+- Filter by date range

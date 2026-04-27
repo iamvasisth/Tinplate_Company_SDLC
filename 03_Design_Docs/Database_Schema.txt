@@ -1,0 +1,56 @@
+Table: Users
+
+- id (Primary Key)
+- name
+- email
+- password
+- role (Admin / Accountant / Owner)
+
+Table: Customers
+
+- id (Primary Key)
+- name
+- phone
+- email
+- address
+
+Table: Vendors
+
+- id (Primary Key)
+- name
+- phone
+- email
+- address
+
+Table: Invoices
+
+- id (Primary Key)
+- customer_id (Foreign Key)
+- date
+- total_amount
+- gst_amount
+- status
+
+Table: Expenses
+
+- id (Primary Key)
+- category
+- amount
+- date
+- description
+
+Table: Inventory
+
+- id (Primary Key)
+- item_name
+- quantity
+- price
+- stock_status
+
+Table: Payments
+
+- id (Primary Key)
+- invoice_id (Foreign Key)
+- amount
+- payment_date
+- payment_method

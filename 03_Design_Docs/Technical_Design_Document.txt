@@ -1,0 +1,34 @@
+TECHNICAL DESIGN DOCUMENT
+
+Project:
+Accounting Web & Mobile Application
+
+Authentication:
+
+- Users will log in using email and password
+- JWT tokens will be used for session management
+- Tokens will be validated on each API request
+
+Data Flow:
+
+- User interacts with frontend (web/mobile)
+- Frontend sends API request to backend
+- Backend processes request and queries database
+- Response is returned to frontend for display
+
+Modules:
+
+- Authentication Module
+- Customer/Vendor Module
+- Sales Module
+- Purchase Module
+- Expense Module
+- Inventory Module
+- Reports Module
+
+Error Handling:
+
+- Validate all user inputs before processing
+- Return meaningful error messages from API
+- Log errors for debugging and monitoring
+
