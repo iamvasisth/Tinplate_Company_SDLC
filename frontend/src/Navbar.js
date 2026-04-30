@@ -1,24 +1,41 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 
-function Navbar({ onLogout }) {
-  const navigate = useNavigate();
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
 
-  return (
-    <div className="navbar">
-      <h3>My App</h3>
-
-      <div>
-        <button onClick={() => navigate('/dashboard')}>
-          Dashboard
-        </button>
-
-        <button onClick={onLogout} style={{ marginLeft: '10px' }}>
-          Logout
-        </button>
+  // ✅ Wait until auth check finishes
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.spinner}></div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-export default Navbar;
+  // ✅ Only redirect AFTER loading is done
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+};
+
+const styles = {
+  container: {
+    height: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center"
+  },
+  spinner: {
+    width: "40px",
+    height: "40px",
+    border: "4px solid #ccc",
+    borderTop: "4px solid #4a90e2",
+    borderRadius: "50%",
+    animation: "spin 1s linear infinite"
+  }
+};
+
+export default ProtectedRoute;

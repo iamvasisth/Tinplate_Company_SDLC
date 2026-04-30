@@ -6,12 +6,12 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 
-// ✅ INIT APP FIRST
-const app = express();
-
-// ✅ ROUTES IMPORT
+const contactRoutes = require("./routes/contactRoutes");
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
+
+// ✅ INIT APP
+const app = express();
 
 // ✅ MIDDLEWARE
 app.use(cors({
@@ -37,16 +37,17 @@ const loginLimiter = rateLimit({
 
 app.use('/api/login', loginLimiter);
 
-// ✅ ROUTES (AFTER APP INIT)
+// ✅ ROUTES
 app.use('/api', authRoutes);
 app.use('/api', dataRoutes);
+app.use('/api', contactRoutes);
 
-// ✅ TEST ROUTE
+// ✅ TEST
 app.get('/', (req, res) => {
   res.send('Server running');
 });
 
-// ✅ START SERVER
+// ✅ START
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
