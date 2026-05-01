@@ -14,16 +14,16 @@ const register = async (req, res) => {
     });
   }
 
-  const { email, password } = req.body;
+  const { email, password, business_type } = req.body; // ✅ now accepts business_type
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
-      `INSERT INTO users (email, password)
-       VALUES ($1, $2)
-       RETURNING id, email`,
-      [email, hashedPassword]
+      `INSERT INTO users (email, password, business_type)
+       VALUES ($1, $2, $3)
+       RETURNING id, email, business_type`,
+      [email, hashedPassword, business_type || "Other"], // ✅ default 'Other' if not provided
     );
 
     res.json({
@@ -57,10 +57,9 @@ const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
 
     if (result.rows.length === 0) {
       return res.status(401).json({ message: "User not found" });
@@ -77,7 +76,7 @@ const login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     res.cookie("token", token, {
@@ -110,8 +109,8 @@ const getProfile = async (req, res) => {
     }
 
     const result = await pool.query(
-      "SELECT id, email FROM users WHERE id = $1",
-      [req.user.id]
+      "SELECT id, email, business_type FROM users WHERE id = $1", // ✅ added business_type
+      [req.user.id],
     );
 
     if (result.rows.length === 0) {
@@ -133,14 +132,15 @@ const getProfile = async (req, res) => {
 };
 
 // ================= LOGOUT =================
-const logout = (req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-  });
-
-  res.json({ message: "Logged out successfully" });
+const logout = async () => {
+  try {
+    const res = await apiRequest("/auth/logout", { method: "POST" });
+    console.log("Logout response:", res); // ← check karo console mein
+  } catch (err) {
+    console.error("Logout error:", err);
+  } finally {
+    window.location.replace("/login"); // ← href ki jagah replace use karo
+  }
 };
 
 module.exports = {

@@ -1,34 +1,42 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiRequest } from './api';
+/**
+ * Login.js – User login form
+ * Dependencies: apiRequest, AuthContext, react-router-dom
+ */
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { apiRequest } from "./api";
 import { useAuth } from "./AuthContext";
 
 function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
 
   const navigate = useNavigate();
   const { user, loading, setUser } = useAuth();
 
+  // If already logged in, go to dashboard
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard');
+      navigate("/dashboard", { replace: true });
     }
   }, [user, loading, navigate]);
 
   const handleLogin = async () => {
     try {
-      const data = await apiRequest('/login', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
+      const data = await apiRequest("/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
       });
 
-      setUser(data.user);
-      navigate('/dashboard');
-
+      if (data && data.user) {
+        setUser(data.user);
+        navigate("/dashboard", { replace: true });
+      } else {
+        setMessage("Login failed");
+      }
     } catch (err) {
-      setMessage(err.message);
+      setMessage(err.message || "Network error");
     }
   };
 
@@ -57,7 +65,9 @@ function Login() {
           Login
         </button>
 
-        <p className="message">{message}</p>
+        <p className="message">
+          Don't have an account? <Link to="/register">Register</Link>
+        </p>
       </div>
     </div>
   );

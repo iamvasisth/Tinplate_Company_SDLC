@@ -1,11 +1,18 @@
-const { Pool } = require('pg');
+/**
+ * db.js – Database connection pool (Neon DB)
+ * Dependencies: pg, dotenv
+ */
+const { Pool } = require("pg");
+require("dotenv").config();
 
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'accounting_db',
-  password: 'Asdf@123',
-  port: 5432,
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // required for Neon
+});
+
+pool.on("error", (err) => {
+  console.error("Unexpected DB pool error:", err);
+  process.exit(-1);
 });
 
 module.exports = pool;
