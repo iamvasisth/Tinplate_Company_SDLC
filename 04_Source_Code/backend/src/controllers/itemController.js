@@ -1,10 +1,10 @@
 /**
- * itemController.js – CRUD operations for inventory items
+ * itemController.js – CRUD for inventory items (Zoho‑style)
  * Dependencies: pool
  */
 const pool = require("../config/db");
 
-// GET all items for the logged-in user
+// GET all items for the logged‑in user
 const getItems = async (req, res) => {
   try {
     const result = await pool.query(
@@ -21,25 +21,29 @@ const getItems = async (req, res) => {
 // ADD a new item
 const addItem = async (req, res) => {
   const {
-    name, sku, hsn_code, tax_rate,
-    buying_price, selling_price, stock_quantity, low_stock_alert
+    name, item_type, unit, sku, hsn_code, tax_rate,
+    selling_price, cost_price, description,
+    sales_account, purchase_account,
+    stock_quantity, low_stock_alert
   } = req.body;
 
   try {
     const result = await pool.query(
       `INSERT INTO items
-         (user_id, name, sku, hsn_code, tax_rate, buying_price, selling_price, stock_quantity, low_stock_alert)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (user_id, name, item_type, unit, sku, hsn_code, tax_rate,
+          selling_price, cost_price, description,
+          sales_account, purchase_account,
+          stock_quantity, low_stock_alert)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
-        req.user.id, name, sku, hsn_code, tax_rate,
-        buying_price, selling_price, stock_quantity, low_stock_alert
+        req.user.id, name, item_type, unit, sku, hsn_code, tax_rate,
+        selling_price, cost_price, description,
+        sales_account, purchase_account,
+        stock_quantity, low_stock_alert
       ]
     );
-    res.json({
-      message: "Item added",
-      item: result.rows[0]
-    });
+    res.json({ message: "Item added", item: result.rows[0] });
   } catch (err) {
     console.error("ADD ITEM ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -50,22 +54,27 @@ const addItem = async (req, res) => {
 const updateItem = async (req, res) => {
   const { id } = req.params;
   const {
-    name, sku, hsn_code, tax_rate,
-    buying_price, selling_price, stock_quantity, low_stock_alert
+    name, item_type, unit, sku, hsn_code, tax_rate,
+    selling_price, cost_price, description,
+    sales_account, purchase_account,
+    stock_quantity, low_stock_alert
   } = req.body;
 
   try {
     const result = await pool.query(
       `UPDATE items
-       SET name = $1, sku = $2, hsn_code = $3, tax_rate = $4,
-           buying_price = $5, selling_price = $6,
-           stock_quantity = $7, low_stock_alert = $8,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9 AND user_id = $10
+       SET name=$1, item_type=$2, unit=$3, sku=$4, hsn_code=$5, tax_rate=$6,
+           selling_price=$7, cost_price=$8, description=$9,
+           sales_account=$10, purchase_account=$11,
+           stock_quantity=$12, low_stock_alert=$13,
+           updated_at=CURRENT_TIMESTAMP
+       WHERE id=$14 AND user_id=$15
        RETURNING *`,
       [
-        name, sku, hsn_code, tax_rate,
-        buying_price, selling_price, stock_quantity, low_stock_alert,
+        name, item_type, unit, sku, hsn_code, tax_rate,
+        selling_price, cost_price, description,
+        sales_account, purchase_account,
+        stock_quantity, low_stock_alert,
         id, req.user.id
       ]
     );

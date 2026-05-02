@@ -74,7 +74,7 @@ const login = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, business_type: user.business_type },
       process.env.JWT_SECRET,
       { expiresIn: "1d" },
     );
@@ -91,8 +91,10 @@ const login = async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
+        business_type: user.business_type || "Other",
       },
     });
+    
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Server error" });
@@ -132,14 +134,19 @@ const getProfile = async (req, res) => {
 };
 
 // ================= LOGOUT =================
-const logout = async () => {
+// ================= LOGOUT =================
+const logout = (req, res) => {
   try {
-    const res = await apiRequest("/auth/logout", { method: "POST" });
-    console.log("Logout response:", res); // ← check karo console mein
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: false, // local dev → false
+      sameSite: "lax",
+    });
+
+    return res.json({ message: "Logged out successfully" });
   } catch (err) {
-    console.error("Logout error:", err);
-  } finally {
-    window.location.replace("/login"); // ← href ki jagah replace use karo
+    console.error("LOGOUT ERROR:", err);
+    return res.status(500).json({ message: "Server error during logout" });
   }
 };
 
