@@ -1,19 +1,18 @@
-/**
- * itemRoutes.js – Inventory item endpoints
- * Dependencies: authMiddleware, itemController
- */
 const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const {
   getItems,
-  addItem,
+  getItemById,
+  createItem,
   updateItem,
-  deleteItem
+  deleteItem,
 } = require("../controllers/itemController");
 
+// All routes require authentication
 router.get("/items", authMiddleware, getItems);
-router.post("/items", authMiddleware, addItem);
+router.get("/items/:id", authMiddleware, getItemById);
+router.post("/items", authMiddleware, createItem);
 router.put("/items/:id", authMiddleware, updateItem);
 router.delete("/items/:id", authMiddleware, deleteItem);
 

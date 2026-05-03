@@ -7,46 +7,56 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { AuthProvider } from "./AuthContext";
 
+
 /**
- * index.js – Entry point with bulletproof ResizeObserver loop suppression
- * The ResizeObserver loop error is a known Chrome bug and does not affect our app.
+ * index.js – Entry point with aggressive ResizeObserver loop suppression
+ * The ResizeObserver loop error is a Chrome bug and does not affect our app.
  */
 
-// ------ Suppression layer (BEFORE anything else) ------
+// ===== SUPPRESSION LAYER (runs before anything else) =====
 (() => {
-  // 1. Patch ResizeObserver to wrap callbacks in a try/catch that swallows the loop error.
-  const NativeResizeObserver = window.ResizeObserver;
-  window.ResizeObserver = class PatchedResizeObserver extends NativeResizeObserver {
+  // 1. Patch ResizeObserver to defer callbacks via requestAnimationFrame
+  const NativeRO = window.ResizeObserver;
+  window.ResizeObserver = class PatchedRO extends NativeRO {
     constructor(callback) {
       super((entries, observer) => {
         try {
           requestAnimationFrame(() => callback(entries, observer));
         } catch (e) {
           if (!e.message?.includes("ResizeObserver loop")) {
-            console.error(e);   // only log other errors
+            console.error(e);
           }
         }
       });
     }
   };
 
-  // 2. Prevent the error from being fired as an `error` event on the window.
+  // 2. Capture-phase error listener (fires BEFORE React's overlay)
   window.addEventListener("error", (e) => {
     if (e.message?.includes("ResizeObserver loop")) {
       e.stopImmediatePropagation();
       e.preventDefault();
     }
-  });
+  }, true);  // ← CAPTURE phase (critical)
 
-  // 3. Also catch it if it somehow escapes as an unhandledrejection (paranoid safety).
+  // 3. Also block it as an unhandled rejection
   window.addEventListener("unhandledrejection", (e) => {
     if (e.reason?.message?.includes("ResizeObserver loop")) {
       e.stopImmediatePropagation();
       e.preventDefault();
     }
-  });
+  }, true);
+
+  // 4. Patch console.error to filter the annoying message
+  const originalConsoleError = console.error;
+  console.error = function (...args) {
+    if (typeof args[0] === 'string' && args[0].includes("ResizeObserver loop")) {
+      return;  // swallow it completely
+    }
+    originalConsoleError.apply(console, args);
+  };
 })();
-// ------ End of suppression layer ------
+// ===== END OF SUPPRESSION =====
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 

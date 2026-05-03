@@ -21,4 +21,5 @@ router.delete("/contacts/:id", authMiddleware, deleteContact);
 // UPDATE contact
 router.put("/contacts/:id", authMiddleware, updateContact);
 
+
 module.exports = router;

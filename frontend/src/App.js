@@ -1,52 +1,56 @@
 /**
- * App.js – Main router for Tinplate Accounting App
+ * App.js – Main router with shared Navbar layout
  * Dependencies: react-router-dom, React components
  */
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Items from "./Items";
+import Login from "./Login";
+import Dashboard from "./Dashboard";
+import CustomerDetail from './CustomerDetail';
+import ProtectedRoute from "./ProtectedRoute";
+import Register from "./Register";
+import Layout from "./Layout";
+import AddItem from './AddItem';
+import Customers from './Customers';
+import ImportMore from './ImportMore';
+import AddCustomer from './AddCustomer';
 
-import Login from './Login';
-import Dashboard from './Dashboard';
-import Contacts from './Contacts';
-import ProtectedRoute from './ProtectedRoute';
-import Register from './Register';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public login page – accessible at root */}
+        {/* Public pages (no Navbar) */}
         <Route path="/" element={<Login />} />
-
-        {/* Redirect /login to / (avoids 404) */}
         <Route path="/login" element={<Navigate to="/" replace />} />
-
-        {/* Protected routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/contacts"
-          element={
-            <ProtectedRoute>
-              <Contacts />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-      {/* Registration route */}
-      <Routes>
         <Route path="/register" element={<Register />} />
+
+        {/* Protected routes wrapped in Layout -> Navbar visible on all */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* Future routes can be added here */}
+          <Route path="/items" element={<Items />} />
+            <Route path="/items/new" element={<AddItem />} />
+          <Route path="/items/:id" element={<AddItem />}
+          />
+          <Route path="/import_more" element={<ImportMore />} />
+          <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/new" element={<AddCustomer />} />
+          <Route path="/customers/:id/edit" element={<AddCustomer />} />
+          <Route path="/customers/:id" element={<CustomerDetail />} />
+          <Route path="/contacts" element={<Navigate to="/customers" replace />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
 }
-
 
 export default App;

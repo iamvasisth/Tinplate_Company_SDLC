@@ -2,21 +2,27 @@ const pool = require("../config/db");
 
 // ================= GET ALL CONTACTS =================
 const getContacts = async (req, res) => {
-    try {
-        const result = await pool.query(
-            "SELECT * FROM contacts ORDER BY id DESC"
-        );
+  try {
+    const { type } = req.query;
+    let query = "SELECT * FROM contacts WHERE 1=1";
+    const values = [];
 
-        res.json({ contacts: result.rows });
-
-    } catch (err) {
-        console.error("GET CONTACTS ERROR:", err);
-        res.status(500).json({ message: "Server error" });
+    if (type) {
+      query += " AND type = $1";
+      values.push(type);
     }
+
+    query += " ORDER BY id DESC";
+    const result = await pool.query(query, values);
+    res.json({ contacts: result.rows });
+  } catch (err) {
+    console.error("GET CONTACTS ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 // ================= ADD CONTACT =================
-const addContact = async (req, res) => {
+async function addContact(req, res) {
     const { name, type, email, phone, address } = req.body;
 
     try {
@@ -36,7 +42,7 @@ const addContact = async (req, res) => {
         console.error("ADD CONTACT ERROR:", err);
         res.status(500).json({ message: "Server error" });
     }
-};
+}
 
 // ================= DELETE CONTACT =================
 const deleteContact = async (req, res) => {
@@ -54,38 +60,23 @@ const deleteContact = async (req, res) => {
 };
 // ================= UPDATE CONTACT =================
 const updateContact = async (req, res) => {
-    const { id } = req.params;
-    const { name, type, email, phone, address } = req.body;
+  const { id } = req.params;
+  const { name, type, email, phone, address } = req.body;
 
-    try {
-        // Check if contact exists
-        const existing = await pool.query(
-            "SELECT * FROM contacts WHERE id = $1",
-            [id]
-        );
-
-        if (existing.rows.length === 0) {
-            return res.status(404).json({ message: "Contact not found" });
-        }
-
-        // Update contact
-        const result = await pool.query(
-            `UPDATE contacts 
-       SET name = $1, type = $2, email = $3, phone = $4, address = $5
-       WHERE id = $6
-       RETURNING *`,
-            [name, type, email, phone, address, id]
-        );
-
-        res.json({
-            message: "Contact updated",
-            contact: result.rows[0],
-        });
-
-    } catch (err) {
-        console.error("UPDATE CONTACT ERROR:", err);
-        res.status(500).json({ message: "Server error" });
+  try {
+    const result = await pool.query(
+      `UPDATE contacts SET name = $1, type = $2, email = $3, phone = $4, address = $5
+       WHERE id = $6 RETURNING *`,
+      [name, type, email || null, phone || null, address || null, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Contact not found" });
     }
+    res.json({ message: "Contact updated", contact: result.rows[0] });
+  } catch (err) {
+    console.error("UPDATE CONTACT ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
 module.exports = {
   getContacts,

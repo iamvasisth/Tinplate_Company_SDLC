@@ -9,6 +9,7 @@ import { apiRequest } from "./api";
 import toast from "react-hot-toast";
 import Navbar from "./Navbar";
 
+
 function Contacts() {
   // ================= STATE =================
   const [contacts, setContacts] = useState([]);

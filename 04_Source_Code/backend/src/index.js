@@ -5,13 +5,17 @@ const cors = require('cors');
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-
+const commentRoutes = require("./routes/commentRoutes");
+const activityRoutes = require("./routes/activityRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const tasksRoutes = require('./routes/tasks');                    // ← ADD
 const authMiddleware = require('./middleware/authMiddleware');     // ← ADD
-const itemRoutes = require("./routes/itemRoutes");   // near other route imports
+const itemRoutes = require("./routes/itemRoutes");  
+const customerRoutes = require("./routes/customerRoutes");
+const usersRoutes = require("./routes/usersRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
 
 
 // ✅ INIT APP
@@ -45,9 +49,13 @@ app.use('/api/login', loginLimiter);
 app.use('/api', authRoutes);
 app.use('/api', dataRoutes);
 app.use('/api', contactRoutes);
+app.use('/api', commentRoutes);
 app.use('/api/tasks', authMiddleware, tasksRoutes); 
-app.use("/api", itemRoutes);                         // near other app.use("/api", ...) lines
-         
+app.use("/api", itemRoutes);   
+app.use("/api", customerRoutes);     
+app.use("/api", usersRoutes);                 
+app.use("/api", invoiceRoutes);
+app.use("/api", activityRoutes);
 
 // ✅ TEST
 app.get('/', (req, res) => {
