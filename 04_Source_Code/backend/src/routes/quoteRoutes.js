@@ -1,7 +1,9 @@
 const express = require("express");
-const { sendEmail } = require("../utils/mailer");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
+const pool = require("../config/db");                    // needed for the send route
+const { sendEmail } = require("../utils/mailer");         // only ONCE
+
 const {
   getQuotes,
   getQuoteById,
@@ -10,24 +12,22 @@ const {
   deleteQuote,
 } = require("../controllers/quoteController");
 
+// ================= CRUD routes =================
 router.get("/quotes", authMiddleware, getQuotes);
 router.get("/quotes/:id", authMiddleware, getQuoteById);
 router.post("/quotes", authMiddleware, createQuote);
 router.put("/quotes/:id", authMiddleware, updateQuote);
 router.delete("/quotes/:id", authMiddleware, deleteQuote);
-// At the top, import the mailer:
-const { sendEmail } = require("../utils/mailer");
 
-// Inside the route definitions, add:
+// ================= Send Quote via Email (Brevo SMTP) =================
 router.post("/quotes/:id/send", authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { to, subject, body, cc, bcc } = req.body;
 
   try {
-    // Fetch quote and customer
     const quoteRes = await pool.query(
       "SELECT * FROM quotes WHERE id = $1 AND user_id = $2",
-      [id, req.user.id],
+      [id, req.user.id]
     );
     if (quoteRes.rows.length === 0) {
       return res.status(404).json({ message: "Quote not found" });
@@ -36,7 +36,7 @@ router.post("/quotes/:id/send", authMiddleware, async (req, res) => {
 
     const custRes = await pool.query(
       "SELECT * FROM customers WHERE id = $1 AND user_id = $2",
-      [quote.customer_id, req.user.id],
+      [quote.customer_id, req.user.id]
     );
     const customer = custRes.rows[0];
 
@@ -45,7 +45,6 @@ router.post("/quotes/:id/send", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Recipient email is required" });
     }
 
-    // Convert body newlines to <br> for HTML email
     const htmlBody = body.replace(/\n/g, "<br>");
 
     await sendEmail({
@@ -56,10 +55,10 @@ router.post("/quotes/:id/send", authMiddleware, async (req, res) => {
       bcc: bcc || undefined,
     });
 
-    // Mark quote as sent
+    // Mark as sent
     await pool.query(
       "UPDATE quotes SET status = 'sent', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
-      [id],
+      [id]
     );
 
     res.json({ message: "Email sent and quote marked as sent" });
