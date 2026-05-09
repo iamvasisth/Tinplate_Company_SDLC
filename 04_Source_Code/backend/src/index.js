@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
+const quoteRoutes = require("./routes/quoteRoutes");
 const rateLimit = require("express-rate-limit");
 const commentRoutes = require("./routes/commentRoutes");
 const activityRoutes = require("./routes/activityRoutes");
@@ -56,7 +57,7 @@ app.use("/api", customerRoutes);
 app.use("/api", usersRoutes);                 
 app.use("/api", invoiceRoutes);
 app.use("/api", activityRoutes);
-
+app.use("/api", quoteRoutes);
 // ✅ TEST
 app.get('/', (req, res) => {
   res.send('Server running');

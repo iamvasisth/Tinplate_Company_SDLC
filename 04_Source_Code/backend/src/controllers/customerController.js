@@ -179,6 +179,7 @@ const createCustomer = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    await logActivity(customerResult.rows[0].id, req.user.id, "created", "Contact created");
     await addActivityLog(
       customerId,
       req.user.id,
@@ -197,8 +198,21 @@ const createCustomer = async (req, res) => {
   }
 };
 
+// ================== ACTIVITY LOGGING FUNCTION (can be used across controllers) =================
+const logActivity = async (customerId, userId, actionType, description) => {
+  try {
+    await pool.query(
+      `INSERT INTO customer_activity_log (customer_id, user_id, action_type, description)
+       VALUES ($1, $2, $3, $4)`,
+      [customerId, userId, actionType, description]
+    );
+  } catch (err) {
+    console.error("LOG ACTIVITY ERROR:", err);
+  }
+};
+
 // ================= UPDATE CUSTOMER =================
-// ================= UPDATE CUSTOMER (partial update) =================
+
 const updateCustomer = async (req, res) => {
   const { id } = req.params;
   const updates = req.body; // all fields sent by the frontend
@@ -325,6 +339,21 @@ const updateCustomer = async (req, res) => {
     }
 
     await client.query("COMMIT");
+    if (customerFields.hasOwnProperty("is_active")) {
+  await logActivity(
+    customerResult.rows[0].id,
+    req.user.id,
+    "status_changed",
+    `Marked as ${customerFields.is_active ? "active" : "inactive"}`
+  );
+} else {
+  await logActivity(
+    customerResult.rows[0].id,
+    req.user.id,
+    "updated",
+    "Contact updated"
+  );
+}
     if (is_active !== undefined) {
       const statusText = is_active ? "Marked as active" : "Marked as inactive";
       await addActivityLog(
@@ -371,10 +400,30 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
+const getActivityLog = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT cal.*, u.email as user_email
+       FROM customer_activity_log cal
+       LEFT JOIN users u ON cal.user_id = u.id
+       WHERE cal.customer_id = $1
+       ORDER BY cal.created_at DESC
+       LIMIT 20`,
+      [id]
+    );
+    res.json({ activities: result.rows });
+  } catch (err) {
+    console.error("GET ACTIVITY ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   getCustomers,
   getCustomerById,
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  getActivityLog,
 };

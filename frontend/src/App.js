@@ -2,15 +2,19 @@
  * App.js – Main router with shared Navbar layout
  * Dependencies: react-router-dom, React components
  */
+import AddQuote from './AddQuote';
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Items from "./Items";
 import Login from "./Login";
+import QuoteEmail from './QuoteEmail';
 import Dashboard from "./Dashboard";
 import CustomerDetail from './CustomerDetail';
 import ProtectedRoute from "./ProtectedRoute";
 import Register from "./Register";
+import Quotes from './Quotes';
 import Layout from "./Layout";
+import QuoteDetail from './QuoteDetail';
 import AddItem from './AddItem';
 import Customers from './Customers';
 import ImportMore from './ImportMore';
@@ -34,6 +38,11 @@ function App() {
             </ProtectedRoute>
           }
         >
+
+          <Route path="/quotes" element={<Quotes />} />
+          <Route path="/quotes/new" element={<AddQuote />} />
+          <Route path="/quotes/:id" element={<QuoteDetail />} />
+          <Route path="/quotes/:id/email" element={<QuoteEmail />} />
           <Route path="/dashboard" element={<Dashboard />} />
           
           {/* Future routes can be added here */}
@@ -45,6 +54,7 @@ function App() {
           <Route path="/customers" element={<Customers />} />
           <Route path="/customers/new" element={<AddCustomer />} />
           <Route path="/customers/:id/edit" element={<AddCustomer />} />
+          
           <Route path="/customers/:id" element={<CustomerDetail />} />
           <Route path="/contacts" element={<Navigate to="/customers" replace />} />
         </Route>

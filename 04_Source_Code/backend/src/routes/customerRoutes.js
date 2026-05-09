@@ -7,6 +7,7 @@ const {
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  getActivityLog
 } = require("../controllers/customerController");
 
 router.get("/customers", authMiddleware, getCustomers);
@@ -14,5 +15,7 @@ router.get("/customers/:id", authMiddleware, getCustomerById);
 router.post("/customers", authMiddleware, createCustomer);
 router.put("/customers/:id", authMiddleware, updateCustomer);
 router.delete("/customers/:id", authMiddleware, deleteCustomer);
+router.get("/customers/:id/activity", authMiddleware, getActivityLog);
+  
 
 module.exports = router;
