@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const expenseRoutes = require("./routes/expenseRoutes");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const quoteRoutes = require("./routes/quoteRoutes");
@@ -17,6 +18,8 @@ const itemRoutes = require("./routes/itemRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const invoiceRoutes = require("./routes/invoiceRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const invoicePreferencesRoutes = require("./routes/invoicePreferencesRoutes");
 
 
 // ✅ INIT APP
@@ -58,6 +61,9 @@ app.use("/api", usersRoutes);
 app.use("/api", invoiceRoutes);
 app.use("/api", activityRoutes);
 app.use("/api", quoteRoutes);
+app.use("/api", invoicePreferencesRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", expenseRoutes);
 // ✅ TEST
 app.get('/', (req, res) => {
   res.send('Server running');

@@ -123,36 +123,65 @@ const createQuote = async (req, res) => {
 // ================= UPDATE QUOTE =================
 const updateQuote = async (req, res) => {
   const { id } = req.params;
-  const { customer_id, quote_date, expiry_date, status, notes, terms, items } = req.body;
+  const updates = req.body;   // only the fields the frontend wants to change
+
+  // Remove fields that should never be directly updated
+  delete updates.id;
+  delete updates.user_id;
+  delete updates.created_at;
+  delete updates.updated_at;
+
+  // If items are included, handle them separately (see below)
+  const { items, ...quoteFields } = updates;
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    const quoteResult = await client.query(
-      `UPDATE quotes
-       SET customer_id = $1, quote_date = $2, expiry_date = $3,
-           status = $4, notes = $5, terms = $6, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 AND user_id = $8
-       RETURNING *`,
-      [
-        customer_id,
-        quote_date,
-        expiry_date,
-        status,
-        notes,
-        terms,
-        id,
-        req.user.id,
-      ]
-    );
-    if (quoteResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ message: "Quote not found" });
+    // Build the SET clause dynamically from provided fields
+    const setColumns = [];
+    const values = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(quoteFields)) {
+      if (value !== undefined) {
+        setColumns.push(`${key} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
     }
 
+    let quoteResult;
+    if (setColumns.length > 0) {
+      // Automatically update the timestamp
+      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      const query = `
+        UPDATE quotes
+        SET ${setColumns.join(", ")}
+        WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+        RETURNING *
+      `;
+      values.push(id, req.user.id);
+      quoteResult = await client.query(query, values);
+      if (quoteResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Quote not found" });
+      }
+    } else {
+      // No fields to update in the quotes table; just fetch current data
+      quoteResult = await client.query(
+        `SELECT * FROM quotes WHERE id = $1 AND user_id = $2`,
+        [id, req.user.id]
+      );
+      if (quoteResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Quote not found" });
+      }
+    }
+
+    // Update items only if the 'items' field is present in the request
     if (items !== undefined) {
-      // Delete old items
       await client.query(`DELETE FROM quote_items WHERE quote_id = $1`, [id]);
 
       let totalAmount = 0;
@@ -162,7 +191,7 @@ const updateQuote = async (req, res) => {
           await client.query(
             `INSERT INTO quote_items
              (quote_id, item_id, description, quantity, unit_price, tax_rate, total)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
               id,
               item.item_id || null,

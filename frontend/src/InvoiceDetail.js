@@ -1,5 +1,5 @@
 /**
- * QuoteDetail.js – Full-featured View / Edit quote page with Brevo SMTP integration
+ * InvoiceDetail.js – Full-featured View / Edit invoice with Record Payment modal
  * Dependencies: apiRequest, react-router-dom, react-hot-toast
  */
 import React, { useState, useEffect } from "react";
@@ -9,45 +9,50 @@ import toast from "react-hot-toast";
 
 const ORG_NAME = "Tinplate Computer Training Center";
 
-function QuoteDetail() {
+function InvoiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // Quote fields
+  // Invoice fields
   const [customerId, setCustomerId] = useState("");
-  const [quoteNumber, setQuoteNumber] = useState("");
-  const [quoteDate, setQuoteDate] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [status, setStatus] = useState("draft");
-  const [customerNotes, setCustomerNotes] = useState("");
+  const [notes, setNotes] = useState("");
   const [terms, setTerms] = useState("");
+  const [balanceDue, setBalanceDue] = useState(0);
+  const [totalAmount, setTotalAmount] = useState(0);
 
   // Items
   const [items, setItems] = useState([]);
-
-  // Price adjustments
-  const [discountPercent, setDiscountPercent] = useState("0");
-  const [discountAmount, setDiscountAmount] = useState("0");
-  const [taxType, setTaxType] = useState("none");
-  const [taxPercent, setTaxPercent] = useState("0");
-  const [adjustment, setAdjustment] = useState("0");
 
   // Customers list for dropdown
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
+  // Payment modal
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMode, setPaymentMode] = useState("cash");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentNotes, setPaymentNotes] = useState("");
+
   // Email modal
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+
+  // Three-dot menu
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Fetch customers for dropdown
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
         const res = await apiRequest("/customers");
-        // Handle both { customers: [...] } and direct array
         setCustomers(res?.customers || res || []);
       } catch (err) {
         toast.error("Failed to load customers");
@@ -56,29 +61,32 @@ function QuoteDetail() {
     fetchCustomers();
   }, []);
 
-  // Fetch quote data
+  // Fetch invoice data
   useEffect(() => {
-    const fetchQuote = async () => {
+    const fetchInvoice = async () => {
       try {
-        const res = await apiRequest(`/quotes/${id}`);
-        if (!res?.quote) {
-          toast.error("Quote not found");
-          navigate("/quotes");
+        const res = await apiRequest(`/invoices/${id}`);
+        if (!res?.invoice) {
+          toast.error("Invoice not found");
+          navigate("/invoices");
           return;
         }
-        const q = res.quote;
-        setCustomerId(q.customer_id ? String(q.customer_id) : "");
-        setQuoteNumber(q.quote_number || "");
-        setQuoteDate(q.quote_date ? q.quote_date.slice(0, 10) : "");
-        setExpiryDate(q.expiry_date ? q.expiry_date.slice(0, 10) : "");
-        setStatus(q.status || "draft");
-        setCustomerNotes(q.notes || "");
-        setTerms(q.terms || "");
+        const inv = res.invoice;
+        setCustomerId(inv.customer_id ? String(inv.customer_id) : "");
+        setInvoiceNumber(inv.invoice_number || "");
+        setInvoiceDate(inv.invoice_date ? inv.invoice_date.slice(0, 10) : "");
+        setDueDate(inv.due_date ? inv.due_date.slice(0, 10) : "");
+        setStatus(inv.status || "draft");
+        setNotes(inv.notes || "");
+        setTerms(inv.terms || "");
+        setBalanceDue(parseFloat(inv.balance_due) || 0);
+        setTotalAmount(parseFloat(inv.total_amount) || 0);
 
-        const quoteItems = res.items || [];
-        if (quoteItems.length > 0) {
+        const invoiceItems = res.items || [];
+        if (invoiceItems.length > 0) {
           setItems(
-            quoteItems.map((item) => ({
+            invoiceItems.map((item) => ({
+              id: item.id,
               description: item.description || "",
               quantity: item.quantity || 1,
               unit_price: item.unit_price || 0,
@@ -91,13 +99,13 @@ function QuoteDetail() {
           ]);
         }
       } catch (err) {
-        toast.error("Failed to load quote");
-        navigate("/quotes");
+        toast.error("Failed to load invoice");
+        navigate("/invoices");
       } finally {
         setFetching(false);
       }
     };
-    fetchQuote();
+    fetchInvoice();
   }, [id, navigate]);
 
   // Item helpers
@@ -125,25 +133,7 @@ function QuoteDetail() {
       (parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0),
     0,
   );
-  const discountVal =
-    discountPercent > 0
-      ? subtotal * (parseFloat(discountPercent) / 100)
-      : parseFloat(discountAmount) || 0;
-  const afterDiscount = subtotal - discountVal;
-  const taxVal =
-    taxType !== "none" && afterDiscount > 0
-      ? afterDiscount * (parseFloat(taxPercent) / 100)
-      : 0;
-  const adjustmentVal = parseFloat(adjustment) || 0;
-  const grandTotal = afterDiscount + taxVal + adjustmentVal;
-
-  useEffect(() => {
-    if (discountPercent > 0) {
-      setDiscountAmount(
-        (subtotal * (parseFloat(discountPercent) / 100)).toFixed(2),
-      );
-    }
-  }, [discountPercent, subtotal]);
+  const grandTotal = subtotal; // can be extended with tax/discount
 
   // Save changes
   const handleSave = async () => {
@@ -153,14 +143,14 @@ function QuoteDetail() {
     }
     setLoading(true);
     try {
-      await apiRequest(`/quotes/${id}`, {
+      await apiRequest(`/invoices/${id}`, {
         method: "PUT",
         body: JSON.stringify({
           customer_id: parseInt(customerId),
-          quote_date: quoteDate,
-          expiry_date: expiryDate || null,
+          invoice_date: invoiceDate,
+          due_date: dueDate || null,
           status,
-          notes: customerNotes,
+          notes,
           terms,
           items: items.map((item) => ({
             ...item,
@@ -170,9 +160,9 @@ function QuoteDetail() {
           })),
         }),
       });
-      toast.success("Quote updated");
+      toast.success("Invoice updated");
     } catch (err) {
-      toast.error("Failed to update quote");
+      toast.error("Failed to update invoice");
     } finally {
       setLoading(false);
     }
@@ -182,12 +172,12 @@ function QuoteDetail() {
   const changeStatus = async (newStatus) => {
     setLoading(true);
     try {
-      await apiRequest(`/quotes/${id}`, {
+      await apiRequest(`/invoices/${id}`, {
         method: "PUT",
         body: JSON.stringify({ status: newStatus }),
       });
       setStatus(newStatus);
-      toast.success(`Quote marked as ${newStatus}`);
+      toast.success(`Invoice marked as ${newStatus}`);
     } catch (err) {
       toast.error("Failed to update status");
     } finally {
@@ -197,33 +187,123 @@ function QuoteDetail() {
 
   // Delete
   const handleDelete = async () => {
-    if (!window.confirm("Delete this quote?")) return;
+    if (!window.confirm("Delete this invoice?")) return;
     try {
-      await apiRequest(`/quotes/${id}`, { method: "DELETE" });
-      toast.success("Quote deleted");
-      navigate("/quotes");
+      await apiRequest(`/invoices/${id}`, { method: "DELETE" });
+      toast.success("Invoice deleted");
+      navigate("/invoices", { state: { refresh: Date.now() }, replace: true });
     } catch (err) {
       toast.error("Delete failed");
     }
   };
 
-  // Helper to safely get customer info
+  // Clone
+  const handleClone = async () => {
+    try {
+      await apiRequest("/invoices", {
+        method: "POST",
+        body: JSON.stringify({
+          customer_id: parseInt(customerId),
+          invoice_date: invoiceDate,
+          due_date: dueDate,
+          status: "draft",
+          notes,
+          terms,
+          items: items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            tax_rate: item.tax_rate,
+          })),
+        }),
+      });
+      toast.success("Invoice cloned");
+      navigate("/invoices", { state: { refresh: Date.now() }, replace: true });
+    } catch (err) {
+      toast.error("Clone failed");
+    }
+  };
+
+  // Helper to get customer info
   const getCustomer = () => {
     const custId = parseInt(customerId);
     return customers.find((c) => c.id === custId) || {};
   };
 
+  // Open email modal
+  const openEmailModal = () => {
+    const cust = getCustomer();
+    setEmailSubject(`Invoice ${invoiceNumber} from ${ORG_NAME}`);
+    setEmailBody(
+      `Dear ${cust.display_name || "Customer"},\n\nPlease find your invoice attached.\n\nInvoice Number: ${invoiceNumber}\nTotal: ₹${totalAmount.toFixed(2)}\n\nThank you for your business.\n\nRegards,\n${ORG_NAME}`,
+    );
+    setShowEmailModal(true);
+  };
+
+  const sendEmailAndMarkSent = async () => {
+    try {
+      await apiRequest(`/invoices/${id}/send`, {
+        method: "POST",
+        body: JSON.stringify({
+          to: getCustomer().email || "",
+          subject: emailSubject,
+          body: emailBody,
+        }),
+      });
+      setShowEmailModal(false);
+      changeStatus("sent");
+      toast.success("Email sent & invoice marked as sent");
+    } catch (err) {
+      toast.error("Failed to send email");
+    }
+  };
+
+  // Record payment handler
+  const handleRecordPayment = async () => {
+    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await apiRequest(`/invoices/${id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({
+          amount: parseFloat(paymentAmount),
+          payment_date: paymentDate,
+          payment_mode: paymentMode,
+          reference: paymentReference,
+          notes: paymentNotes,
+        }),
+      });
+      toast.success("Payment recorded");
+      // Update local state
+      const newBalance = res.newBalanceDue;
+      setBalanceDue(newBalance);
+      if (newBalance <= 0) setStatus("paid");
+      // Reset form
+      setShowPaymentModal(false);
+      setPaymentAmount("");
+      setPaymentReference("");
+      setPaymentNotes("");
+    } catch (err) {
+      toast.error("Failed to record payment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (fetching) {
     return (
       <div style={{ padding: "50px", textAlign: "center" }}>
-        Loading quote...
+        Loading invoice...
       </div>
     );
   }
 
   return (
     <div style={{ maxWidth: "900px", margin: "auto", padding: "30px" }}>
-      {/* Header with status badge and delete */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -232,7 +312,7 @@ function QuoteDetail() {
           marginBottom: "20px",
         }}
       >
-        <h2>Quote {quoteNumber}</h2>
+        <h2>Invoice {invoiceNumber}</h2>
         <div>
           <span
             style={{
@@ -241,19 +321,19 @@ function QuoteDetail() {
               fontSize: "14px",
               fontWeight: "500",
               background:
-                status === "accepted"
+                status === "paid"
                   ? "#d4edda"
                   : status === "sent"
                     ? "#fff3cd"
-                    : status === "declined"
+                    : status === "overdue"
                       ? "#f8d7da"
                       : "#e2e3e5",
               color:
-                status === "accepted"
+                status === "paid"
                   ? "#155724"
                   : status === "sent"
                     ? "#856404"
-                    : status === "declined"
+                    : status === "overdue"
                       ? "#721c24"
                       : "#383d41",
               marginRight: "15px",
@@ -267,72 +347,105 @@ function QuoteDetail() {
         </div>
       </div>
 
-      {/* Status workflow buttons */}
+      {/* Summary line */}
+      <div
+        style={{
+          background: "#f9fafb",
+          padding: "15px",
+          borderRadius: "8px",
+          marginBottom: "20px",
+          display: "flex",
+          gap: "30px",
+        }}
+      >
+        <div>
+          <strong>Total:</strong> ₹{totalAmount.toFixed(2)}
+        </div>
+        <div>
+          <strong>Balance Due:</strong>{" "}
+          <span style={{ color: balanceDue <= 0 ? "green" : "red" }}>
+            ₹{balanceDue.toFixed(2)}
+          </span>
+        </div>
+        <div>
+          <strong>Status:</strong> {status}
+        </div>
+      </div>
+
+      {/* Action buttons */}
       <div
         style={{
           display: "flex",
           gap: "10px",
           marginBottom: "25px",
           flexWrap: "wrap",
+          alignItems: "center",
         }}
       >
-        {/* Quick send email via modal */}
-        <button
-          onClick={() => {
-            const customer = getCustomer();
-            setEmailSubject(`Quote ${quoteNumber} from ${ORG_NAME}`);
-            setEmailBody(
-              `Dear ${customer.display_name || "Customer"},\n\nPlease find your quote attached.\n\nQuote Number: ${quoteNumber}\nTotal: ₹${grandTotal.toFixed(2)}\n\nThank you for your business.\n\nRegards,\n${ORG_NAME}`,
-            );
-            setShowEmailModal(true);
-          }}
-          style={secondaryBtn}
-        >
+        <button onClick={openEmailModal} style={secondaryBtn}>
           ✉️ Send Email
         </button>
-
-        {/* Dedicated Gmail‑style composer */}
         <button
-          onClick={() => navigate(`/quotes/${id}/email`)}
+          onClick={() => setShowPaymentModal(true)}
           style={{
             ...secondaryBtn,
-            background: "#f39c12",
+            background: "#28a745",
             color: "#fff",
             border: "none",
           }}
         >
-          📧 Compose Email
+          💰 Record Payment
+        </button>
+        <button
+          onClick={() => navigate(`/invoices/${id}/document`)}
+          style={{
+            ...secondaryBtn,
+            border: "1px solid #28a745",
+            color: "#28a745",
+          }}
+        >
+          📄 View Document
         </button>
 
-        {status !== "sent" && (
-          <button onClick={() => changeStatus("sent")} style={secondaryBtn}>
-            Mark as Sent
+        {/* Three-dot menu */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setMenuOpen(!menuOpen)} style={secondaryBtn}>
+            ⋯
           </button>
-        )}
-        {status !== "accepted" && (
-          <button
-            onClick={() => changeStatus("accepted")}
-            style={{ ...secondaryBtn, background: "#d4edda", color: "#155724" }}
-          >
-            Mark as Accepted
-          </button>
-        )}
-        {status !== "declined" && (
-          <button
-            onClick={() => changeStatus("declined")}
-            style={{ ...secondaryBtn, background: "#f8d7da", color: "#721c24" }}
-          >
-            Mark as Declined
-          </button>
-        )}
-        {status === "accepted" && (
-          <button
-            onClick={() => toast("Convert to invoice coming soon")}
-            style={primaryBtn}
-          >
-            Convert to Invoice
-          </button>
-        )}
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                right: 0,
+                top: "100%",
+                background: "#fff",
+                borderRadius: "6px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                zIndex: 10,
+                minWidth: "160px",
+              }}
+            >
+              <button
+                style={menuItemStyle}
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleClone();
+                }}
+              >
+                📋 Clone
+              </button>
+              <button
+                style={menuItemStyle}
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleDelete();
+                }}
+              >
+                🗑️ Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Customer Dropdown */}
@@ -360,23 +473,23 @@ function QuoteDetail() {
       <div style={{ display: "flex", gap: "15px", marginBottom: "15px" }}>
         <div style={{ flex: 1 }}>
           <label>
-            <strong>Quote Date</strong>
+            <strong>Invoice Date</strong>
           </label>
           <input
             type="date"
-            value={quoteDate}
-            onChange={(e) => setQuoteDate(e.target.value)}
+            value={invoiceDate}
+            onChange={(e) => setInvoiceDate(e.target.value)}
             style={inputStyle}
           />
         </div>
         <div style={{ flex: 1 }}>
           <label>
-            <strong>Expiry Date</strong>
+            <strong>Due Date</strong>
           </label>
           <input
             type="date"
-            value={expiryDate}
-            onChange={(e) => setExpiryDate(e.target.value)}
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
             style={inputStyle}
           />
         </div>
@@ -405,11 +518,11 @@ function QuoteDetail() {
       >
         <thead>
           <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-            <th style={thStyle}>Item Details</th>
-            <th style={thStyle}>Quantity</th>
-            <th style={thStyle}>Rate</th>
+            <th style={thStyle}>Description</th>
+            <th style={thStyle}>Qty</th>
+            <th style={thStyle}>Unit Price</th>
             <th style={thStyle}>Tax %</th>
-            <th style={thStyle}>Amount</th>
+            <th style={thStyle}>Total</th>
             <th style={thStyle}></th>
           </tr>
         </thead>
@@ -477,21 +590,33 @@ function QuoteDetail() {
         </tbody>
       </table>
 
-      {/* Customer Notes */}
+      {/* Notes & Terms */}
       <div style={{ marginBottom: "15px" }}>
         <label>
-          <strong>Customer Notes</strong>
+          <strong>Notes</strong>
         </label>
         <textarea
-          value={customerNotes}
-          onChange={(e) => setCustomerNotes(e.target.value)}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           rows={2}
           style={inputStyle}
-          placeholder="Looking forward for your business."
+          placeholder="Additional notes..."
+        />
+      </div>
+      <div style={{ marginBottom: "20px" }}>
+        <label>
+          <strong>Terms & Conditions</strong>
+        </label>
+        <textarea
+          value={terms}
+          onChange={(e) => setTerms(e.target.value)}
+          rows={2}
+          style={inputStyle}
+          placeholder="Terms and conditions..."
         />
       </div>
 
-      {/* Totals & Adjustments */}
+      {/* Totals */}
       <div
         style={{
           background: "#f9fafb",
@@ -504,129 +629,17 @@ function QuoteDetail() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            marginBottom: "8px",
-          }}
-        >
-          <span>Sub Total</span>
-          <span>₹{subtotal.toFixed(2)}</span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px",
-          }}
-        >
-          <span>Discount</span>
-          <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={discountPercent}
-              onChange={(e) => {
-                setDiscountPercent(e.target.value);
-                if (e.target.value === "0") setDiscountAmount("0");
-              }}
-              style={{ ...inputStyle, width: "60px" }}
-            />
-            <span>%</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={discountAmount}
-              onChange={(e) => {
-                setDiscountAmount(e.target.value);
-                setDiscountPercent("0");
-              }}
-              style={{ ...inputStyle, width: "80px" }}
-            />
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px",
-          }}
-        >
-          <span>Tax</span>
-          <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
-            <select
-              value={taxType}
-              onChange={(e) => setTaxType(e.target.value)}
-              style={{ ...inputStyle, width: "80px" }}
-            >
-              <option value="none">None</option>
-              <option value="tds">TDS</option>
-              <option value="tcs">TCS</option>
-            </select>
-            {taxType !== "none" && (
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={taxPercent}
-                onChange={(e) => setTaxPercent(e.target.value)}
-                style={{ ...inputStyle, width: "60px" }}
-              />
-            )}
-            {taxType !== "none" && <span>%</span>}
-            <span style={{ marginLeft: "10px" }}>₹{taxVal.toFixed(2)}</span>
-          </div>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "8px",
-          }}
-        >
-          <span>Adjustment</span>
-          <input
-            type="number"
-            value={adjustment}
-            onChange={(e) => setAdjustment(e.target.value)}
-            style={{ ...inputStyle, width: "80px" }}
-          />
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
             fontWeight: "bold",
-            fontSize: "16px",
-            marginTop: "10px",
-            borderTop: "1px solid #ddd",
-            paddingTop: "10px",
           }}
         >
-          <span>Total (₹)</span>
+          <span>Total</span>
           <span>₹{grandTotal.toFixed(2)}</span>
         </div>
       </div>
 
-      {/* Terms & Conditions */}
-      <div style={{ marginBottom: "15px" }}>
-        <label>
-          <strong>Terms & Conditions</strong>
-        </label>
-        <textarea
-          value={terms}
-          onChange={(e) => setTerms(e.target.value)}
-          rows={3}
-          style={inputStyle}
-          placeholder="Enter the terms and conditions of your business to be displayed in your transaction"
-        />
-      </div>
-
       {/* Actions */}
       <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-        <button onClick={() => navigate("/quotes")} style={cancelBtnStyle}>
+        <button onClick={() => navigate("/invoices")} style={cancelBtnStyle}>
           Back to List
         </button>
         <button onClick={handleSave} disabled={loading} style={primaryBtn}>
@@ -660,8 +673,7 @@ function QuoteDetail() {
               boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
             }}
           >
-            <h3 style={{ marginTop: 0 }}>Send Quote via Email</h3>
-
+            <h3 style={{ marginTop: 0 }}>Send Invoice via Email</h3>
             <div style={{ marginBottom: "15px" }}>
               <label>
                 <strong>To:</strong>
@@ -673,7 +685,6 @@ function QuoteDetail() {
                 style={{ ...inputStyle, background: "#f9f9f9" }}
               />
             </div>
-
             <div style={{ marginBottom: "15px" }}>
               <label>
                 <strong>Subject:</strong>
@@ -685,7 +696,6 @@ function QuoteDetail() {
                 style={inputStyle}
               />
             </div>
-
             <div style={{ marginBottom: "20px" }}>
               <label>
                 <strong>Message:</strong>
@@ -697,7 +707,6 @@ function QuoteDetail() {
                 style={inputStyle}
               />
             </div>
-
             <div
               style={{
                 display: "flex",
@@ -711,49 +720,111 @@ function QuoteDetail() {
               >
                 Cancel
               </button>
+              <button onClick={sendEmailAndMarkSent} style={primaryBtn}>
+                Send & Mark as Sent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== RECORD PAYMENT MODAL ===== */}
+      {showPaymentModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "8px",
+              padding: "25px",
+              width: "450px",
+              maxWidth: "90%",
+            }}
+          >
+            <h3>Record Payment</h3>
+            <div style={{ marginBottom: "15px" }}>
+              <label>Amount *</label>
+              <input
+                type="number"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+              <div style={{ flex: 1 }}>
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Mode</label>
+                <select
+                  value={paymentMode}
+                  onChange={(e) => setPaymentMode(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                  <option value="upi">UPI</option>
+                  <option value="cheque">Cheque</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: "15px" }}>
+              <label>Reference</label>
+              <input
+                type="text"
+                value={paymentReference}
+                onChange={(e) => setPaymentReference(e.target.value)}
+                style={inputStyle}
+                placeholder="Transaction ID / Cheque #"
+              />
+            </div>
+            <div style={{ marginBottom: "20px" }}>
+              <label>Notes</label>
+              <textarea
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+                rows={2}
+                style={inputStyle}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+              }}
+            >
               <button
-                onClick={() => navigate(`/quotes/${id}/document`)}
-                style={{
-                  ...secondaryBtn,
-                  border: "1px solid #28a745",
-                  color: "#28a745",
-                }}
+                onClick={() => setShowPaymentModal(false)}
+                style={cancelBtnStyle}
               >
-                📄 View Document
+                Cancel
               </button>
               <button
-                onClick={() => {
-                  const customer = getCustomer();
-                  const mailto = `mailto:${customer.email || ""}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-                  window.open(mailto);
-                  setShowEmailModal(false);
-                  toast.success("Email client opened");
-                }}
-                style={secondaryBtn}
-              >
-                Send Only
-              </button>
-              <button
-                onClick={async () => {
-                  try {
-                    await apiRequest(`/quotes/${id}/send`, {
-                      method: "POST",
-                      body: JSON.stringify({
-                        to: getCustomer().email || "",
-                        subject: emailSubject,
-                        body: emailBody,
-                      }),
-                    });
-                    changeStatus("sent");
-                    setShowEmailModal(false);
-                    toast.success("Email sent & quote marked as sent");
-                  } catch (err) {
-                    toast.error("Failed to send email");
-                  }
-                }}
+                onClick={handleRecordPayment}
+                disabled={loading}
                 style={primaryBtn}
               >
-                Send & Mark as Sent
+                {loading ? "Saving..." : "Record Payment"}
               </button>
             </div>
           </div>
@@ -819,5 +890,15 @@ const deleteBtnStyle = {
   borderRadius: "5px",
   cursor: "pointer",
 };
+const menuItemStyle = {
+  display: "block",
+  width: "100%",
+  padding: "8px 16px",
+  border: "none",
+  background: "none",
+  textAlign: "left",
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
 
-export default QuoteDetail;
+export default InvoiceDetail;
