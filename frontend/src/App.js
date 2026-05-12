@@ -10,6 +10,7 @@ import Login from "./Login";
 import InvoiceDetail from "./InvoiceDetail";
 import QuoteEmail from "./QuoteEmail";
 import Dashboard from "./Dashboard";
+import Banking from './Banking';
 import CustomerDetail from "./CustomerDetail";
 import ProtectedRoute from "./ProtectedRoute";
 import InvoicePreferences from "./InvoicePreferences";
@@ -62,6 +63,7 @@ function App() {
           <Route path="/invoices/:id/document" element={<InvoiceDocument />} />
 
           <Route path="/expenses" element={<Expenses />} />
+          <Route path="/banking" element={<Banking />} />
           {/* Future routes can be added here */}
           <Route path="/items" element={<Items />} />
           <Route path="/items/new" element={<AddItem />} />

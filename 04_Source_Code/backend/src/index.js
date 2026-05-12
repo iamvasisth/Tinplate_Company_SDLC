@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const expenseRoutes = require("./routes/expenseRoutes");
 const cookieParser = require("cookie-parser");
+const bankRoutes = require("./routes/bankRoutes");
 const helmet = require("helmet");
 const quoteRoutes = require("./routes/quoteRoutes");
 const rateLimit = require("express-rate-limit");
@@ -64,6 +65,9 @@ app.use("/api", quoteRoutes);
 app.use("/api", invoicePreferencesRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api", expenseRoutes);
+app.use("/api", bankRoutes);
+
+
 // ✅ TEST
 app.get('/', (req, res) => {
   res.send('Server running');
