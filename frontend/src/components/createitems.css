@@ -1,0 +1,91 @@
+/* PLUS BUTTON */
+.topbar-plus-btn {
+  width: 45px;
+  height: 45px;
+  border: none;
+  border-radius: 10px;
+  background: #2f6fed;
+  color: white;
+  font-size: 30px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.topbar-plus-btn:hover {
+  background: #1f5fe0;
+}
+
+/* MEGA MENU */
+.mega-menu {
+  position: absolute;
+  top: 54px;
+  right: 0;
+
+  width: max-content;
+  max-width: calc(100vw - 270px); /* Leave room for sidebar */
+
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+
+  display: flex;
+  gap: 32px;
+
+  box-shadow: 0px 8px 30px rgba(0,0,0,0.15);
+  border: 1px solid #e2e8f0;
+
+  overflow-x: auto;
+  z-index: 1005;
+}
+
+/* COLUMNS */
+.menu-column {
+  min-width: 160px;
+}
+
+.menu-column h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* MENU ITEMS */
+.menu-column p {
+  font-size: 14px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  color: #1e293b;
+  font-weight: 500;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+}
+
+.menu-column p:hover {
+  color: #2563eb;
+  transform: translateX(4px);
+}
+
+/* RESPONSIVE */
+@media (max-width: 1100px) {
+  .mega-menu {
+    max-width: calc(100vw - 90px); /* Leave room for collapsed sidebar */
+    gap: 20px;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .mega-menu {
+    max-width: calc(100vw - 40px);
+    flex-wrap: wrap;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .menu-column {
+    min-width: 140px;
+  }
+}
