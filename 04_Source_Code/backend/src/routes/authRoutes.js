@@ -10,7 +10,10 @@ const authController = require('../controllers/authController');
 // ================= VALIDATIONS =================
 const registerValidation = [
   body('email').isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password min 6 chars')
+  body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
+  body("organization_name")
+    .notEmpty()
+    .withMessage("Organization name is required"),
 ];
 
 const loginValidation = [
@@ -27,6 +30,5 @@ router.post('/login', loginValidation, authController.login);
 router.post('/logout', authController.logout);
 
 router.get('/profile', authMiddleware, authController.getProfile);
-
 
 module.exports = router;

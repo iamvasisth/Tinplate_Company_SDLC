@@ -1,0 +1,408 @@
+/* ================================================
+   Sidebar.css – Zoho Books-style left sidebar
+   Fixed position for full-page coverage
+   ================================================ */
+
+/* ── Base sidebar: FIXED to fill entire viewport height ── */
+.sidebar {
+  width: 240px;
+  height: 100%;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #1b2337;
+  border-right: 1px solid #283352;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed {
+  width: 68px;
+}
+
+/* ── Brand ── */
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 18px 18px;
+  border-bottom: 1px solid #283352;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2f80ed, #56ccf2);
+  color: white;
+  font-weight: 800;
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* ── Collapse button (desktop only) ── */
+.sidebar-collapse-btn {
+  position: absolute;
+  right: -14px;
+  top: 76px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #e4e8f2;
+  border-radius: 50%;
+  background: white;
+  color: #334155;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+  z-index: 30;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.sidebar-collapse-btn:hover {
+  background: #f0f4ff;
+  transform: scale(1.1);
+}
+
+.sidebar-collapse-btn:focus-visible {
+  outline: 2px solid #2f80ed;
+  outline-offset: 2px;
+}
+
+/* ── Hamburger button (mobile only) ── */
+.sidebar-hamburger {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: #1b2337;
+  color: white;
+  font-size: 20px;
+  z-index: 50;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s;
+}
+
+.sidebar-hamburger:hover {
+  background: #2a3352;
+}
+
+/* ── Mobile overlay ── */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 25;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Navigation ── */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 10px;
+  flex: 1;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #3a4a6b;
+  border-radius: 4px;
+}
+
+.sidebar-menu-block {
+  /* Container for each menu item + possible submenu */
+}
+
+.sidebar-menu-btn {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #c0c8e0;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.sidebar-menu-btn:hover {
+  background: rgba(47, 128, 237, 0.12);
+  color: #ffffff;
+}
+
+.sidebar-menu-btn:focus-visible {
+  outline: 2px solid #56b4ff;
+  outline-offset: -2px;
+}
+
+.sidebar-menu-btn.active {
+  background: #2f80ed;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sidebar-menu-icon {
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.sidebar-menu-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-arrow {
+  font-size: 14px;
+  transition: transform 0.25s ease;
+  color: #8892b0;
+  flex-shrink: 0;
+}
+
+.sidebar-arrow.open {
+  transform: rotate(90deg);
+}
+
+.sidebar.collapsed .sidebar-menu-btn {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+/* ── Submenu ── */
+.sidebar-submenu {
+  margin: 2px 0 6px 34px;
+  padding-left: 10px;
+  border-left: 2px solid rgba(47, 128, 237, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sidebar-submenu-btn {
+  border: 0;
+  background: transparent;
+  color: #8892b0;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.sidebar-submenu-btn:hover {
+  background: rgba(47, 128, 237, 0.1);
+  color: #ffffff;
+}
+
+.sidebar-submenu-btn:focus-visible {
+  outline: 2px solid #56b4ff;
+  outline-offset: -2px;
+}
+
+.sidebar-submenu-btn.active {
+  color: #56b4ff;
+  font-weight: 600;
+}
+
+/* ── Footer ── */
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 18px;
+  border-top: 1px solid #283352;
+  flex-shrink: 0;
+}
+
+.sidebar-configure-btn {
+  border: 0;
+  background: rgba(47, 128, 237, 0.1);
+  color: #8faddf;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.sidebar-configure-btn:hover {
+  background: rgba(47, 128, 237, 0.2);
+  color: #ffffff;
+}
+
+.sidebar-tour-btn {
+  border: 1px solid #283352;
+  background: transparent;
+  color: #8892b0;
+  padding: 11px 14px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.sidebar-tour-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #c0c8e0;
+}
+
+/* ================================================================
+   RESPONSIVE BREAKPOINTS
+   ================================================================ */
+
+/* ── Tablet: 769px – 1100px ── */
+@media (max-width: 1100px) and (min-width: 769px) {
+  .sidebar {
+    width: 200px;
+  }
+
+  .sidebar.collapsed {
+    width: 62px;
+  }
+
+  .sidebar-brand-text {
+    font-size: 17px;
+  }
+
+  .sidebar-menu-btn {
+    font-size: 13px;
+    min-height: 38px;
+    padding: 8px 10px;
+    gap: 10px;
+  }
+
+  .sidebar-submenu-btn {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+
+  .sidebar-submenu {
+    margin-left: 28px;
+  }
+
+  .sidebar-footer {
+    padding: 10px 10px 14px;
+  }
+
+  .sidebar-configure-btn,
+  .sidebar-tour-btn {
+    padding: 9px 12px;
+    font-size: 11px;
+  }
+}
+
+/* ── Mobile: ≤ 768px ── */
+@media (max-width: 768px) {
+  .sidebar.sidebar-mobile {
+    left: -280px;
+    width: 260px;
+    z-index: 30;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+
+  .sidebar.sidebar-mobile.sidebar-mobile-open {
+    left: 0;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar-collapse-btn {
+    display: none;
+  }
+
+  .sidebar-menu-btn {
+    min-height: 44px;
+    font-size: 14px;
+  }
+}
+
+/* ── Very small screens ── */
+@media (max-width: 480px) {
+  .sidebar.sidebar-mobile {
+    width: 240px;
+    left: -260px;
+  }
+
+  .sidebar-hamburger {
+    width: 36px;
+    height: 36px;
+    top: 10px;
+    left: 10px;
+    font-size: 18px;
+  }
+
+  .sidebar-brand {
+    padding: 14px 14px 14px 16px;
+  }
+
+  .sidebar-brand-text {
+    font-size: 18px;
+  }
+}

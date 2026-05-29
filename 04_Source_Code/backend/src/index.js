@@ -2,13 +2,28 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const expenseRoutes = require("./routes/expenseRoutes");
 const cookieParser = require("cookie-parser");
+const bankRoutes = require("./routes/bankRoutes");
 const helmet = require("helmet");
+const quoteRoutes = require("./routes/quoteRoutes");
 const rateLimit = require("express-rate-limit");
-
+const commentRoutes = require("./routes/commentRoutes");
+const activityRoutes = require("./routes/activityRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const authRoutes = require('./routes/authRoutes');
 const dataRoutes = require('./routes/dataRoutes');
+const tasksRoutes = require('./routes/tasks');                    // ← ADD
+const authMiddleware = require('./middleware/authMiddleware');     // ← ADD
+const itemRoutes = require("./routes/itemRoutes");  
+const customerRoutes = require("./routes/customerRoutes");
+const usersRoutes = require("./routes/usersRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const invoicePreferencesRoutes = require("./routes/invoicePreferencesRoutes");
+const salespersonRoutes = require("./routes/salespersonRoutes");
+const projectRoutes = require("./routes/projectRoutes");
+
 
 // ✅ INIT APP
 const app = express();
@@ -41,6 +56,21 @@ app.use('/api/login', loginLimiter);
 app.use('/api', authRoutes);
 app.use('/api', dataRoutes);
 app.use('/api', contactRoutes);
+app.use('/api', commentRoutes);
+app.use('/api/tasks', authMiddleware, tasksRoutes); 
+app.use("/api", itemRoutes);   
+app.use("/api", customerRoutes);     
+app.use("/api", usersRoutes);                 
+app.use("/api", invoiceRoutes);
+app.use("/api", activityRoutes);
+app.use("/api", quoteRoutes);
+app.use("/api", invoicePreferencesRoutes);
+app.use("/api", paymentRoutes);
+app.use("/api", expenseRoutes);
+app.use("/api", bankRoutes);
+app.use("/api", salespersonRoutes);
+app.use("/api", projectRoutes);
+
 
 // ✅ TEST
 app.get('/', (req, res) => {

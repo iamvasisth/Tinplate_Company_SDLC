@@ -1,0 +1,391 @@
+const pool = require("../config/db");
+
+// ---- ensure extra columns exist (safe to re-run) ----
+const ensureColumns = async () => {
+  const alterStatements = [
+    `ALTER TABLE quotes ADD COLUMN IF NOT EXISTS salesperson_id INTEGER`,
+    `ALTER TABLE quotes ADD COLUMN IF NOT EXISTS project_id INTEGER`,
+    `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT 0`,
+    `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) DEFAULT 'flat'`,
+  ];
+  for (const sql of alterStatements) {
+    try { await pool.query(sql); } catch (_) { /* column may already exist */ }
+  }
+};
+ensureColumns();
+
+// ================= GET ALL QUOTES (for logged-in user) =================
+const getQuotes = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM quotes WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.id]
+    );
+    res.json({ quotes: result.rows });
+  } catch (err) {
+    console.error("GET QUOTES ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ================= GET SINGLE QUOTE (with items) =================
+const getQuoteById = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const quoteResult = await pool.query(
+      `SELECT * FROM quotes WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (quoteResult.rows.length === 0) {
+      return res.status(404).json({ message: "Quote not found" });
+    }
+
+    const itemsResult = await pool.query(
+      `SELECT qi.*, i.name as item_name
+       FROM quote_items qi
+       LEFT JOIN items i ON qi.item_id = i.id
+       WHERE qi.quote_id = $1`,
+      [id]
+    );
+
+    res.json({
+      quote: quoteResult.rows[0],
+      items: itemsResult.rows,
+    });
+  } catch (err) {
+    console.error("GET QUOTE ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ================= CREATE QUOTE =================
+const createQuote = async (req, res) => {
+  const { customer_id, quote_date, expiry_date, status, notes, terms, items, salesperson_id, project_id } = req.body;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Generate quote number (simple: Q-YYYYMMDD-XXXX)
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const countResult = await client.query(
+      `SELECT COUNT(*) FROM quotes WHERE quote_date = $1`,
+      [quote_date || new Date().toISOString().slice(0, 10)]
+    );
+    const count = parseInt(countResult.rows[0].count) + 1;
+    const quoteNumber = `Q-${today}-${String(count).padStart(4, "0")}`;
+
+    const quoteResult = await client.query(
+      `INSERT INTO quotes
+       (customer_id, user_id, quote_number, quote_date, expiry_date, status, notes, terms, total_amount, salesperson_id, project_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,$9,$10)
+       RETURNING *`,
+      [
+        customer_id,
+        req.user.id,
+        quoteNumber,
+        quote_date || new Date().toISOString().slice(0, 10),
+        expiry_date || null,
+        status || "draft",
+        notes || null,
+        terms || null,
+        salesperson_id || null,
+        project_id || null,
+      ]
+    );
+    const quoteId = quoteResult.rows[0].id;
+
+    let totalAmount = 0;
+
+    if (Array.isArray(items) && items.length > 0) {
+      for (const item of items) {
+        const qty = parseFloat(item.quantity) || 0;
+        const rate = parseFloat(item.unit_price) || 0;
+        const disc = parseFloat(item.discount) || 0;
+        const discType = item.discount_type || "flat";
+        const taxRate = parseFloat(item.tax_rate) || 0;
+
+        let lineTotal = qty * rate;
+        // Apply discount
+        if (discType === "percent") {
+          lineTotal -= lineTotal * (disc / 100);
+        } else {
+          lineTotal -= disc;
+        }
+        // Apply tax
+        const taxAmt = lineTotal * (taxRate / 100);
+        lineTotal += taxAmt;
+
+        await client.query(
+          `INSERT INTO quote_items
+           (quote_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [
+            quoteId,
+            item.item_id || null,
+            item.description || null,
+            item.quantity || 1,
+            item.unit_price || 0,
+            item.tax_rate || 0,
+            disc,
+            discType,
+            lineTotal,
+          ]
+        );
+        totalAmount += lineTotal;
+      }
+    }
+
+    // Update total
+    await client.query(
+      `UPDATE quotes SET total_amount = $1 WHERE id = $2`,
+      [totalAmount, quoteId]
+    );
+    quoteResult.rows[0].total_amount = totalAmount;
+
+    await client.query("COMMIT");
+    res.json({ message: "Quote created", quote: quoteResult.rows[0] });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("CREATE QUOTE ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  } finally {
+    client.release();
+  }
+};
+
+// ================= UPDATE QUOTE =================
+const updateQuote = async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;   // only the fields the frontend wants to change
+
+  // Remove fields that should never be directly updated
+  delete updates.id;
+  delete updates.user_id;
+  delete updates.created_at;
+  delete updates.updated_at;
+
+  // If items are included, handle them separately (see below)
+  const { items, ...quoteFields } = updates;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Build the SET clause dynamically from provided fields
+    const setColumns = [];
+    const values = [];
+    let paramIndex = 1;
+
+    for (const [key, value] of Object.entries(quoteFields)) {
+      if (value !== undefined) {
+        setColumns.push(`${key} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+
+    let quoteResult;
+    if (setColumns.length > 0) {
+      // Automatically update the timestamp
+      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      const query = `
+        UPDATE quotes
+        SET ${setColumns.join(", ")}
+        WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+        RETURNING *
+      `;
+      values.push(id, req.user.id);
+      quoteResult = await client.query(query, values);
+      if (quoteResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Quote not found" });
+      }
+    } else {
+      // No fields to update in the quotes table; just fetch current data
+      quoteResult = await client.query(
+        `SELECT * FROM quotes WHERE id = $1 AND user_id = $2`,
+        [id, req.user.id]
+      );
+      if (quoteResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Quote not found" });
+      }
+    }
+
+    // Update items only if the 'items' field is present in the request
+    if (items !== undefined) {
+      await client.query(`DELETE FROM quote_items WHERE quote_id = $1`, [id]);
+
+      let totalAmount = 0;
+      if (Array.isArray(items) && items.length > 0) {
+        for (const item of items) {
+          const qty = parseFloat(item.quantity) || 0;
+          const rate = parseFloat(item.unit_price) || 0;
+          const disc = parseFloat(item.discount) || 0;
+          const discType = item.discount_type || "flat";
+          const taxRate = parseFloat(item.tax_rate) || 0;
+
+          let lineTotal = qty * rate;
+          if (discType === "percent") {
+            lineTotal -= lineTotal * (disc / 100);
+          } else {
+            lineTotal -= disc;
+          }
+          const taxAmt = lineTotal * (taxRate / 100);
+          lineTotal += taxAmt;
+
+          await client.query(
+            `INSERT INTO quote_items
+             (quote_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [
+              id,
+              item.item_id || null,
+              item.description || null,
+              item.quantity || 1,
+              item.unit_price || 0,
+              item.tax_rate || 0,
+              disc,
+              discType,
+              lineTotal,
+            ]
+          );
+          totalAmount += lineTotal;
+        }
+      }
+      await client.query(`UPDATE quotes SET total_amount = $1 WHERE id = $2`, [totalAmount, id]);
+    }
+
+    await client.query("COMMIT");
+    res.json({ message: "Quote updated", quote: quoteResult.rows[0] });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("UPDATE QUOTE ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  } finally {
+    client.release();
+  }
+};
+
+// ================= DELETE QUOTE =================
+const deleteQuote = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `DELETE FROM quotes WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [id, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Quote not found" });
+    }
+    res.json({ message: "Quote deleted" });
+  } catch (err) {
+    console.error("DELETE QUOTE ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ================= CONVERT QUOTE TO INVOICE =================
+const convertQuoteToInvoice = async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Fetch quote
+    const quoteRes = await client.query(
+      `SELECT * FROM quotes WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+    if (quoteRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Quote not found" });
+    }
+    const quote = quoteRes.rows[0];
+
+    // Fetch quote items
+    const qiRes = await client.query(
+      `SELECT * FROM quote_items WHERE quote_id = $1`,
+      [id]
+    );
+    const quoteItems = qiRes.rows;
+
+    // Generate invoice number
+    const invNumber = "INV-" + Date.now();
+
+    // Ensure invoice columns exist
+    try {
+      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS salesperson_id INTEGER`);
+      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS project_id INTEGER`);
+      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS balance_due NUMERIC(12,2) DEFAULT 0`);
+      await client.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT 0`);
+      await client.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) DEFAULT 'flat'`);
+    } catch (_) {}
+
+    // Create invoice from quote
+    const invResult = await client.query(
+      `INSERT INTO invoices (customer_id, user_id, invoice_number, invoice_date, due_date, status, notes, terms, total_amount, balance_due, salesperson_id, project_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [
+        quote.customer_id,
+        req.user.id,
+        invNumber,
+        new Date().toISOString().slice(0, 10),
+        null,
+        "draft",
+        quote.notes,
+        quote.terms,
+        quote.total_amount,
+        quote.total_amount,
+        quote.salesperson_id || null,
+        quote.project_id || null,
+      ]
+    );
+    const invoiceId = invResult.rows[0].id;
+
+    // Copy items
+    for (const item of quoteItems) {
+      await client.query(
+        `INSERT INTO invoice_items (invoice_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          invoiceId,
+          item.item_id,
+          item.description,
+          item.quantity,
+          item.unit_price,
+          item.tax_rate,
+          item.discount || 0,
+          item.discount_type || "flat",
+          item.total,
+        ]
+      );
+    }
+
+    // Mark quote as invoiced
+    await client.query(
+      `UPDATE quotes SET status = 'invoiced', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [id]
+    );
+
+    await client.query("COMMIT");
+    res.json({ message: "Quote converted to invoice", invoice: invResult.rows[0] });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("CONVERT QUOTE ERROR:", err);
+    res.status(500).json({ message: "Failed to convert quote" });
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = {
+  getQuotes,
+  getQuoteById,
+  createQuote,
+  updateQuote,
+  deleteQuote,
+  convertQuoteToInvoice,
+};
