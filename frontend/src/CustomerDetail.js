@@ -6,7 +6,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "./api";
+import { DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
+import CustomerStatement from "./CustomerStatement";
 
 function CustomerDetail() {
   const { id } = useParams();
@@ -36,7 +38,13 @@ function CustomerDetail() {
     fetchCustomer();
   }, [id]);
 
-  if (loading) return <p>Loading...</p>;
+  const [activeTab, setActiveTab] = useState("Overview");
+
+  if (loading) return (
+    <div style={{ padding: "30px", maxWidth: "1200px", margin: "auto" }}>
+      <DetailSkeleton />
+    </div>
+  );
   if (!customer) return <p>Customer not found.</p>;
 
   const billing = addresses.find(a => a.type === "billing");
@@ -55,19 +63,28 @@ function CustomerDetail() {
         </button>
       </div>
 
-      {/* Tabs – we only implement Overview now */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0", marginBottom: "30px" }}>
-        <div style={{ padding: "10px 20px", borderBottom: "3px solid #4a90e2", fontWeight: "bold", color: "#4a90e2", cursor: "pointer" }}>
-          Overview
-        </div>
-        <div style={{ padding: "10px 20px", color: "#999", cursor: "default" }}>Comments</div>
-        <div style={{ padding: "10px 20px", color: "#999", cursor: "default" }}>Transactions</div>
-        <div style={{ padding: "10px 20px", color: "#999", cursor: "default" }}>Mails</div>
-        <div style={{ padding: "10px 20px", color: "#999", cursor: "default" }}>Statement</div>
+      {/* Tabs */}
+      <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0", marginBottom: "30px", gap: "20px" }}>
+        {["Overview", "Statement"].map(tab => (
+          <div 
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            style={{ 
+              padding: "10px 0", 
+              borderBottom: activeTab === tab ? "3px solid #4a90e2" : "3px solid transparent", 
+              fontWeight: activeTab === tab ? "bold" : "normal", 
+              color: activeTab === tab ? "#4a90e2" : "#64748b", 
+              cursor: "pointer" 
+            }}
+          >
+            {tab}
+          </div>
+        ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px" }}>
-        {/* Left column – Addresses */}
+      {activeTab === "Overview" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px" }}>
+          {/* Left column – Addresses */}
         <div>
           <h3 style={{ marginBottom: "15px" }}>Billing Address</h3>
           <div style={cardStyle}>
@@ -135,7 +152,12 @@ function CustomerDetail() {
             <p><strong>Remarks:</strong> {customer.remarks || "—"}</p>
           </div>
         </div>
-      </div>
+        </div>
+      )}
+
+      {activeTab === "Statement" && (
+        <CustomerStatement customerId={id} />
+      )}
     </div>
   );
 }

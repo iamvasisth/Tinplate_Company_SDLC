@@ -76,6 +76,7 @@ function QuoteDocument() {
     >
       {/* Editable org info (exactly like Customer Statement) */}
       <div
+        className="print-hide"
         style={{
           marginBottom: "20px",
           borderBottom: "1px solid #eee",
@@ -84,7 +85,7 @@ function QuoteDocument() {
       >
         <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 200px" }}>
-            <label style={labelStyle}>Organization Name</label>
+            <label style={labelStyle} className="print-label">Organization Name</label>
             <input
               type="text"
               value={orgInfo.name}
@@ -93,7 +94,7 @@ function QuoteDocument() {
             />
           </div>
           <div style={{ flex: "1 1 200px" }}>
-            <label style={labelStyle}>Organization Address</label>
+            <label style={labelStyle} className="print-label">Organization Address</label>
             <textarea
               value={orgInfo.address}
               onChange={(e) =>
@@ -104,7 +105,7 @@ function QuoteDocument() {
             />
           </div>
           <div style={{ flex: "1 1 150px" }}>
-            <label style={labelStyle}>Country</label>
+            <label style={labelStyle} className="print-label">Country</label>
             <input
               type="text"
               value={orgInfo.country}
@@ -115,7 +116,7 @@ function QuoteDocument() {
             />
           </div>
           <div style={{ flex: "1 1 200px" }}>
-            <label style={labelStyle}>Email</label>
+            <label style={labelStyle} className="print-label">Email</label>
             <input
               type="email"
               value={orgInfo.email}
@@ -159,30 +160,53 @@ function QuoteDocument() {
           <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
             <th style={thStyle}>#</th>
             <th style={thStyle}>Item & Description</th>
-            <th style={thStyle}>Qty</th>
-            <th style={thStyle}>Rate</th>
-            <th style={thStyle}>Amount</th>
+            <th style={{ ...thStyle, textAlign: "center" }}>HSN/SAC</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>Qty</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>Rate</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>Tax%</th>
+            <th style={{ ...thStyle, textAlign: "right" }}>Amount</th>
           </tr>
         </thead>
         <tbody>
           {items.length > 0 ? (
             items.map((item, idx) => {
-              const qty = parseFloat(item.quantity) || 0;
-              const rate = parseFloat(item.unit_price) || 0;
-              const amount = qty * rate;
+              const qty      = parseFloat(item.quantity)   || 0;
+              const rate     = parseFloat(item.unit_price) || 0;
+              const disc     = parseFloat(item.discount)   || 0;
+              const discType = item.discount_type || "flat";
+              const taxRate  = parseFloat(item.tax_rate)   || 0;
+              let lineAmt = qty * rate;
+              if (discType === "percent") lineAmt -= lineAmt * (disc / 100);
+              else lineAmt -= disc;
+              const taxAmt = lineAmt * (taxRate / 100);
+              const total  = lineAmt + taxAmt;
+
               return (
                 <tr key={idx} style={{ borderBottom: "1px solid #e2e8f0" }}>
                   <td style={tdStyle}>{idx + 1}</td>
-                  <td style={tdStyle}>{item.description || "—"}</td>
-                  <td style={tdStyle}>{qty.toFixed(2)}</td>
-                  <td style={tdStyle}>₹{rate.toFixed(2)}</td>
-                  <td style={tdStyle}>₹{amount.toFixed(2)}</td>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: "500" }}>{item.item_name || item.description || "—"}</div>
+                    {item.item_name && item.description && item.description !== item.item_name && (
+                      <div style={{ fontSize: "12px", color: "#64748b" }}>{item.description}</div>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "center", color: "#64748b" }}>
+                    {item.hsn_code || "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    {qty.toFixed(2)}{item.unit ? ` ${item.unit}` : ""}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>₹{rate.toFixed(2)}</td>
+                  <td style={{ ...tdStyle, textAlign: "right" }}>
+                    {taxRate > 0 ? `${taxRate}%` : "—"}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: "500" }}>₹{total.toFixed(2)}</td>
                 </tr>
               );
             })
           ) : (
             <tr>
-              <td colSpan={5} style={tdStyle}>
+              <td colSpan={7} style={tdStyle}>
                 No items
               </td>
             </tr>
@@ -230,6 +254,7 @@ function QuoteDocument() {
 
       {/* Action Buttons */}
       <div
+        className="print-hide"
         style={{
           display: "flex",
           gap: "10px",

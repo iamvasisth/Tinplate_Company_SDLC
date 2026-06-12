@@ -3,9 +3,12 @@
  * dynamic income chart, column customization, etc.
  */
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton, DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
+import { useAuth } from "./AuthContext";
+import { canAccess, MODULES, ACTIONS } from "./utils/permissions";
 
 
 const BLUE = '#4a90e2';
@@ -37,7 +40,11 @@ const ALL_COLUMNS = [
 ];
 
 function Customers() {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParamsUrl = new URLSearchParams(location.search);
+  const searchQuery = searchParamsUrl.get("search") || "";
 
   const timeAgo = (dateString) => {
     if (!dateString) return "";
@@ -121,8 +128,6 @@ function Customers() {
 
   // PDF download loading state
   const [pdfLoading, setPdfLoading] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   const StatusBadge = ({ isActive }) => (
     <span style={{
@@ -512,7 +517,7 @@ function Customers() {
     setPdfLoading(true);
     try {
       const range = getStatementDates();
-      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/customers/${expandedId}/statement/pdf?from=${range.from}&to=${range.to}`;
+      const url = `${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/customers/${expandedId}/statement/pdf?from=${range.from}&to=${range.to}`;
       const response = await fetch(url, { credentials: 'include' });
       if (!response.ok) throw new Error('PDF generation failed');
       const blob = await response.blob();
@@ -546,7 +551,7 @@ function Customers() {
     const range = getStatementDates();
     try {
       const res = await fetch(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/customers/${expandedId}/statement/send`,
+        `${process.env.REACT_APP_API_URL || 'http://localhost:5001/api'}/customers/${expandedId}/statement/send`,
         {
           method: 'POST',
           credentials: 'include',
@@ -679,7 +684,9 @@ function Customers() {
     fontWeight: activeTab === name ? "bold" : "normal",
     color: activeTab === name ? "#4a90e2" : "#333",
     background: "none",
-    border: "none",
+    borderTop: "none",
+    borderLeft: "none",
+    borderRight: "none",
     borderBottom: activeTab === name ? "3px solid #4a90e2" : "3px solid transparent",
   });
 
@@ -714,9 +721,11 @@ function Customers() {
             <option value="active">Active Customers</option>
             <option value="inactive">Inactive Customers</option>
           </select>
+          {canAccess(user?.role, MODULES.CUSTOMERS, ACTIONS.CREATE) && (
           <button onClick={() => navigate("/customers/new")} style={{ background: BLUE, color: "#fff", borderRadius: "6px", padding: "10px 20px", border: "none", cursor: "pointer", fontWeight: "500" }}>
             + New Customer
           </button>
+          )}
           <div style={{ position: "relative" }}>
             <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", padding: "5px", color: TEXT_SECONDARY }}>☰</button>
             {menuOpen && (
@@ -750,7 +759,15 @@ function Customers() {
             type="text"
             placeholder="Search by name, email or company..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              const newParams = new URLSearchParams(location.search);
+              if (e.target.value) {
+                newParams.set("search", e.target.value);
+              } else {
+                newParams.delete("search");
+              }
+              navigate({ search: newParams.toString() }, { replace: true });
+            }}
             style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: RADIUS, border: `1px solid ${BORDER_COLOR}`, outline: "none", fontSize: "14px", boxSizing: "border-box" }}
             onFocus={e => e.target.style.borderColor = BLUE}
             onBlur={e => e.target.style.borderColor = BORDER_COLOR}
@@ -768,16 +785,13 @@ function Customers() {
 
       <div style={{ background: BG_CARD, borderRadius: RADIUS, boxShadow: SHADOW, border: `1px solid ${BORDER_COLOR}`, overflow: "hidden" }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⟳</div>
-            <p>Loading customers...</p>
-          </div>
+          <TableSkeleton rows={8} columns={6} />
         ) : filteredCustomers.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#94a3b8' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
             <h3 style={{ color: '#374151', marginBottom: '8px' }}>No customers found</h3>
             <p style={{ marginBottom: '20px' }}>{searchQuery ? 'No customers match your search.' : 'Start by adding your first customer.'}</p>
-            {!searchQuery && (
+            {!searchQuery && canAccess(user?.role, MODULES.CUSTOMERS, ACTIONS.CREATE) && (
               <button onClick={() => navigate('/customers/new')} style={{ background: BLUE, color: "#fff", borderRadius: "6px", padding: "10px 20px", border: "none", cursor: "pointer" }}>+ New Customer</button>
             )}
           </div>
@@ -836,7 +850,9 @@ function Customers() {
                       <tr>
                         <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2 || 1} style={{ padding: "0" }}>
                           {expandedLoading ? (
-                            <div style={{ padding: "30px", background: "#f9fafb", textAlign: "center" }}>Loading details...</div>
+                            <div style={{ padding: "30px", background: "#f9fafb" }}>
+                              <DetailSkeleton />
+                            </div>
                           ) : expandedCustomer ? (
                             <div style={{ padding: "20px 30px", background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)" }}>
                               {/* Header */}

@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiRequest } from "./api";
+import { FormSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 
@@ -57,7 +58,7 @@ const labelStyle = {
   marginBottom: '6px',
 };
 
-function AddCustomer() {
+function AddCustomer({ onSaveSuccess, onCancel, isModal }) {
   const navigate = useNavigate();
   const { id } = useParams();          // ✅ edit mode when id exists
   const isEdit = Boolean(id);
@@ -277,11 +278,19 @@ function AddCustomer() {
       };
 
       if (isEdit) {
-        await apiRequest(`/customers/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        const res = await apiRequest(`/customers/${id}`, { method: "PUT", body: JSON.stringify(payload) });
         toast.success("Customer updated");
+        if (onSaveSuccess) {
+          onSaveSuccess(res?.customer);
+          return;
+        }
       } else {
-        await apiRequest("/customers", { method: "POST", body: JSON.stringify(payload) });
+        const res = await apiRequest("/customers", { method: "POST", body: JSON.stringify(payload) });
         toast.success("Customer created");
+        if (onSaveSuccess) {
+          onSaveSuccess(res?.customer);
+          return;
+        }
       }
       navigate("/customers");
     } catch (err) {
@@ -293,20 +302,26 @@ function AddCustomer() {
 
   // loading state while fetching existing data
   if (fetching) {
-    return <p style={{ textAlign: "center", padding: "50px" }}>Loading customer data...</p>;
+    return (
+      <div style={{ maxWidth: "900px", margin: "auto", padding: "30px" }}>
+        <FormSkeleton fields={8} />
+      </div>
+    );
   }
 
   return (
-    <div style={{ maxWidth: "900px", margin: "auto", padding: "30px", background: BG_PAGE, minHeight: "100vh" }}>
+    <div style={isModal ? { padding: "10px", background: BG_CARD } : { maxWidth: "900px", margin: "auto", padding: "30px", background: BG_PAGE, minHeight: "100vh" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: "20px", paddingBottom: "15px", borderBottom: `1px solid ${BORDER_COLOR}` }}>
-        <button onClick={() => navigate("/customers")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", color: TEXT_SECONDARY, marginRight: "15px", padding: 0 }}>
-          ← Back to Customers
-        </button>
-        <h2 style={{ margin: 0, color: TEXT_PRIMARY }}>{isEdit ? "Edit Customer" : "New Customer"}</h2>
-      </div>
+      {!isModal && (
+        <div style={{ display: "flex", alignItems: "center", marginBottom: "20px", paddingBottom: "15px", borderBottom: `1px solid ${BORDER_COLOR}` }}>
+          <button onClick={() => navigate("/customers")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", color: TEXT_SECONDARY, marginRight: "15px", padding: 0 }}>
+            ← Back to Customers
+          </button>
+          <h2 style={{ margin: 0, color: TEXT_PRIMARY }}>{isEdit ? "Edit Customer" : "New Customer"}</h2>
+        </div>
+      )}
 
-      <div style={{ background: BG_CARD, border: `1px solid ${BORDER_COLOR}`, borderRadius: '10px', padding: '30px', boxShadow: SHADOW }}>
+      <div style={isModal ? { background: BG_CARD } : { background: BG_CARD, border: `1px solid ${BORDER_COLOR}`, borderRadius: '10px', padding: '30px', boxShadow: SHADOW }}>
         
         {/* Main Visible Section */}
         <div style={{ marginBottom: "20px" }}>
@@ -338,10 +353,17 @@ function AddCustomer() {
           </div>
         </div>
 
-        <div style={{ marginBottom: "20px" }}>
-          <label style={labelStyle}>Company Name</label>
-          <input value={companyName} onChange={e => setCompanyName(e.target.value)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
-        </div>
+        {customerType === "Individual" ? (
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Father's Name</label>
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+          </div>
+        ) : (
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Company Name</label>
+            <input value={companyName} onChange={e => setCompanyName(e.target.value)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+          </div>
+        )}
 
         <div style={{ marginBottom: "20px" }}>
           <label style={labelStyle}>Display Name *</label>
@@ -565,7 +587,7 @@ function AddCustomer() {
 
         {/* Action Buttons */}
         <div style={{ marginTop: "30px", paddingTop: "20px", borderTop: `1px solid ${BORDER_COLOR}`, display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-          <button onClick={() => navigate("/customers")} style={{ padding: "10px 20px", background: "#fff", color: TEXT_PRIMARY, border: `1px solid #d1d5db`, borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "500" }}>Cancel</button>
+          <button onClick={() => onCancel ? onCancel() : navigate("/customers")} style={{ padding: "10px 20px", background: "#fff", color: TEXT_PRIMARY, border: `1px solid #d1d5db`, borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "500" }}>Cancel</button>
           <button onClick={handleSave} disabled={loading} style={{ padding: "10px 20px", background: BLUE, color: "#fff", border: "none", borderRadius: "6px", cursor: loading ? "not-allowed" : "pointer", fontSize: "14px", fontWeight: "500", opacity: loading ? 0.7 : 1 }}>
             {loading ? "Saving..." : isEdit ? "Update" : "Save"}
           </button>

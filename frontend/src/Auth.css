@@ -280,6 +280,13 @@ body {
   transform: translateY(0);
 }
 
+.auth-submit-btn:disabled {
+  background: #93a8f0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .auth-bottom-text {
   margin-top: 31px;
   text-align: center;

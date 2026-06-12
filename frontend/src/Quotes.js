@@ -5,6 +5,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton, DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 const ORG_NAME = "Tinplate Computer Training Center";
@@ -101,10 +102,34 @@ function Quotes() {
   };
 
   const handleConvertToInvoice = async (quoteId) => {
+    if (!window.confirm("Convert this quote to an invoice?")) return;
     try {
-      await apiRequest(`/quotes/${quoteId}/convert-to-invoice`, { method: "POST" });
-      toast.success("Quote converted to invoice");
-      changeStatus(quoteId, "invoiced");
+      const res = await apiRequest(`/quotes/${quoteId}/convert-to-invoice`, { method: "POST" });
+      if (res?.alreadyConverted) {
+        toast("Already converted. Opening existing invoice.", { icon: "ℹ️" });
+        navigate(`/invoices/${res.invoiceId}`);
+        return;
+      }
+      toast.success("Quote converted to invoice!");
+      setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: "invoiced" } : q));
+      if (expandedQuote?.id === quoteId) setExpandedQuote(prev => ({ ...prev, status: "invoiced" }));
+      navigate(`/invoices/${res.invoiceId}`);
+    } catch (err) { toast.error("Conversion failed"); }
+  };
+
+  const handleConvertToSalesOrder = async (quoteId) => {
+    if (!window.confirm("Convert this quote to a Sales Order?")) return;
+    try {
+      const res = await apiRequest(`/sales-orders/from-quote/${quoteId}`, { method: "POST" });
+      if (res?.alreadyConverted) {
+        toast("Already converted. Opening existing Sales Order.", { icon: "ℹ️" });
+        navigate(`/sales-orders/${res.salesOrderId}/document`);
+        return;
+      }
+      toast.success("Quote converted to Sales Order!");
+      setQuotes(prev => prev.map(q => q.id === quoteId ? { ...q, status: "accepted" } : q));
+      if (expandedQuote?.id === quoteId) setExpandedQuote(prev => ({ ...prev, status: "accepted" }));
+      navigate(`/sales-orders/${res.salesOrderId}/document`);
     } catch (err) { toast.error("Conversion failed"); }
   };
 
@@ -157,7 +182,7 @@ function Quotes() {
         </select>
       </div>
 
-      {loading ? <p>Loading...</p> : filteredQuotes.length === 0 ? (
+      {loading ? <TableSkeleton columns={5} rows={4} /> : filteredQuotes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px", color: "gray" }}>
           <p>No quotes found.</p>
           <button onClick={() => navigate("/quotes/new")} style={{ ...primaryBtn, marginTop: "15px" }}>+ New Quote</button>
@@ -184,7 +209,9 @@ function Quotes() {
                 {expandedId === q.id && (
                   <tr><td colSpan={5} style={{ padding: "0" }}>
                     {expandedLoading ? (
-                      <div style={{ padding: "20px", background: "#f9fafb", textAlign: "center" }}>Loading quote details...</div>
+                      <div style={{ padding: "30px", background: "#f9fafb" }}>
+                        <DetailSkeleton />
+                      </div>
                     ) : expandedQuote ? (
                       <div style={{ padding: "20px 25px", background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.03)" }}>
                         {/* Action buttons */}
@@ -193,8 +220,26 @@ function Quotes() {
                           {expandedQuote.status !== "sent" && <button onClick={() => changeStatus(q.id, "sent")} style={smallSecondaryBtn}>Mark Sent</button>}
                           {expandedQuote.status !== "accepted" && <button onClick={() => changeStatus(q.id, "accepted")} style={{ ...smallSecondaryBtn, background: "#d4edda", color: "#155724" }}>Accept</button>}
                           {expandedQuote.status !== "declined" && <button onClick={() => changeStatus(q.id, "declined")} style={{ ...smallSecondaryBtn, background: "#f8d7da", color: "#721c24" }}>Decline</button>}
-                          {expandedQuote.status === "accepted" && (
-                            <button onClick={() => handleConvertToInvoice(q.id)} style={{ ...smallSecondaryBtn, background: "#28a745", color: "#fff", border: "none" }}>📄 Convert to Invoice</button>
+                          {expandedQuote.status !== "declined" && expandedQuote.status !== "invoiced" && (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleConvertToSalesOrder(q.id); }}
+                                style={{ ...smallSecondaryBtn, background: "#17a2b8", color: "#fff", border: "none" }}
+                              >
+                                🔄 Convert to Sales Order
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleConvertToInvoice(q.id); }}
+                                style={{ ...smallSecondaryBtn, background: "#28a745", color: "#fff", border: "none" }}
+                              >
+                                🔄 Convert to Invoice
+                              </button>
+                            </>
+                          )}
+                          {expandedQuote.status === "invoiced" && (
+                            <span style={{ fontSize: "13px", color: "#0c5460", background: "#d1ecf1", padding: "6px 12px", borderRadius: "5px", fontWeight: "500" }}>
+                              ✅ Invoiced
+                            </span>
                           )}
                           <button onClick={() => navigate(`/quotes/${q.id}`)} style={{ ...smallSecondaryBtn, border: "1px solid #4a90e2", color: "#4a90e2" }}>Edit</button>
                           <button onClick={() => navigate(`/quotes/${q.id}/document`)} style={{ ...smallSecondaryBtn, border: "1px solid #28a745", color: "#28a745" }}>📄 Document</button>

@@ -23,6 +23,27 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const invoicePreferencesRoutes = require("./routes/invoicePreferencesRoutes");
 const salespersonRoutes = require("./routes/salespersonRoutes");
 const projectRoutes = require("./routes/projectRoutes");
+const timesheetRoutes = require("./routes/timesheetRoutes");
+const recurringInvoiceRoutes = require("./routes/recurringInvoiceRoutes");
+const transactionLockRoutes = require("./routes/transactionLockRoutes");
+const bulkUpdateRoutes = require("./routes/bulkUpdateRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const billRoutes = require("./routes/billRoutes");
+const taxRoutes = require("./routes/taxRoutes");
+const accountingRoutes = require("./routes/accountingRoutes");
+const reportsRoutes = require("./routes/reportsRoutes");
+const paymentMadeRoutes = require("./routes/paymentMadeRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const salesOrderRoutes = require("./routes/salesOrderRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const deliveryChallanRoutes = require("./routes/deliveryChallanRoutes");
+const creditNoteRoutes = require("./routes/creditNoteRoutes");
+const vendorCreditRoutes = require("./routes/vendorCreditRoutes");
+const globalSearchRoutes = require("./routes/globalSearchRoutes");
+
+
 
 
 // ✅ INIT APP
@@ -46,7 +67,8 @@ app.use(
 // ✅ RATE LIMIT
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 100, // Increased from 5 to 100 to prevent lockout during testing
+  skipSuccessfulRequests: true, // Successful logins don't count towards the limit
   message: { message: "Too many login attempts. Try again later." },
 });
 
@@ -70,6 +92,26 @@ app.use("/api", expenseRoutes);
 app.use("/api", bankRoutes);
 app.use("/api", salespersonRoutes);
 app.use("/api", projectRoutes);
+app.use("/api", timesheetRoutes);
+app.use("/api", recurringInvoiceRoutes);
+app.use("/api", transactionLockRoutes);
+app.use("/api", bulkUpdateRoutes);
+app.use("/api", vendorRoutes);
+app.use("/api", billRoutes);
+app.use("/api", taxRoutes);
+app.use("/api", accountingRoutes);
+app.use("/api", reportsRoutes);
+app.use("/api", paymentMadeRoutes);
+app.use("/api", inventoryRoutes);
+app.use("/api", documentRoutes);
+app.use("/api/dashboard", authMiddleware, dashboardRoutes);
+app.use("/api", salesOrderRoutes);
+app.use("/api", purchaseOrderRoutes);
+app.use("/api", deliveryChallanRoutes);
+app.use("/api", creditNoteRoutes);
+app.use("/api", vendorCreditRoutes);
+app.use("/api/search", globalSearchRoutes);
+
 
 
 // ✅ TEST
@@ -78,7 +120,7 @@ app.get('/', (req, res) => {
 });
 
 // ✅ START
-const PORT = 5000;
+const PORT = 5001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

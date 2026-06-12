@@ -86,13 +86,16 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./AuthContext";
+import RuppLogo from "./components/RuppLogo";
 import "./Auth.css";
 
 function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem("rememberedEmail") || "");
+  const [password, setPassword] = useState(() => localStorage.getItem("rememberedPassword") || "");
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("rememberedEmail"));
 
   const navigate = useNavigate();
   const { user, loading, setUser } = useAuth();
@@ -105,18 +108,33 @@ function Login() {
     e.preventDefault();
     setMessage("");
 
-    if (!email || !password) {
-      setMessage("Please enter email and password");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setMessage("Please enter both email and password");
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setMessage("Please enter a valid email address format");
+      return;
+    }
+
+    setIsLoggingIn(true);
     try {
       const data = await apiRequest("/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: trimmedEmail, password, rememberMe }),
       });
 
       if (data && data.user) {
+        if (rememberMe) {
+          localStorage.setItem("rememberedEmail", trimmedEmail);
+          localStorage.setItem("rememberedPassword", password);
+        } else {
+          localStorage.removeItem("rememberedEmail");
+          localStorage.removeItem("rememberedPassword");
+        }
         setUser(data.user);
         navigate("/dashboard", { replace: true });
       } else {
@@ -124,6 +142,8 @@ function Login() {
       }
     } catch (err) {
       setMessage(err.message || "Network error");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -133,9 +153,8 @@ function Login() {
         <div className="auth-overlay"></div>
 
         <div className="auth-left-content">
-          <div className="auth-brand-badge">
-            <span className="auth-book-icon"></span>
-            <span>RUPP Books</span>
+          <div className="auth-brand-badge" style={{ padding: "4px" }}>
+            <RuppLogo theme="dark" width={140} height={36} />
           </div>
 
           <h1 className="auth-hero-title">Accounting Made Simple</h1>
@@ -191,7 +210,11 @@ function Login() {
 
             <div className="auth-options-row">
               <label className="auth-remember">
-                <input type="checkbox" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
                 <span>Remember me</span>
               </label>
 
@@ -202,8 +225,8 @@ function Login() {
 
             {message && <p className="auth-error">{message}</p>}
 
-            <button type="submit" className="auth-submit-btn">
-              Sign In
+            <button type="submit" className="auth-submit-btn" disabled={isLoggingIn}>
+              {isLoggingIn ? "Signing In..." : "Sign In"}
             </button>
           </form>
 

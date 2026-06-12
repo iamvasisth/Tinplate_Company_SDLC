@@ -1,21 +1,25 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/roleMiddleware');
+const { MODULES, ACTIONS } = require('../config/permissions');
 const {
   getCustomers,
   getCustomerById,
   createCustomer,
   updateCustomer,
   deleteCustomer,
-  getActivityLog
+  getActivityLog,
+  getCustomerStatement
 } = require("../controllers/customerController");
 
-router.get("/customers", authMiddleware, getCustomers);
-router.get("/customers/:id", authMiddleware, getCustomerById);
-router.post("/customers", authMiddleware, createCustomer);
-router.put("/customers/:id", authMiddleware, updateCustomer);
-router.delete("/customers/:id", authMiddleware, deleteCustomer);
-router.get("/customers/:id/activity", authMiddleware, getActivityLog);
+router.get("/customers", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.VIEW), getCustomers);
+router.get("/customers/:id", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.VIEW), getCustomerById);
+router.post("/customers", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.CREATE), createCustomer);
+router.put("/customers/:id", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.EDIT), updateCustomer);
+router.delete("/customers/:id", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.DELETE), deleteCustomer);
+router.get("/customers/:id/activity", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.VIEW), getActivityLog);
+router.get("/customers/:id/statement", authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.VIEW), getCustomerStatement);
 
 // ── Statement PDF & Email routes ─────────────────────────────────────────────
 const nodemailer = require('nodemailer');
@@ -36,7 +40,7 @@ async function getCustomerInvoicesInRange(customerId, userId, fromDate, toDate) 
 }
 
 // GET /customers/:id/statement/pdf — Download statement as real PDF
-router.get('/customers/:id/statement/pdf', authMiddleware, async (req, res) => {
+router.get('/customers/:id/statement/pdf', authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.EXPORT), async (req, res) => {
   const { id } = req.params;
   const { from, to } = req.query;
 
@@ -67,7 +71,7 @@ router.get('/customers/:id/statement/pdf', authMiddleware, async (req, res) => {
 });
 
 // POST /customers/:id/statement/send — Generate PDF + email it as attachment
-router.post('/customers/:id/statement/send', authMiddleware, async (req, res) => {
+router.post('/customers/:id/statement/send', authMiddleware, requirePermission(MODULES.CUSTOMERS, ACTIONS.EXPORT), async (req, res) => {
   const { id } = req.params;
   const { to: emailTo, subject, body: emailBody, from: fromDate, to_date: toDate } = req.body;
 

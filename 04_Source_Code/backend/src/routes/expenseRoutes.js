@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/roleMiddleware');
+const { MODULES, ACTIONS } = require('../config/permissions');
 const {
   getExpenses,
   getExpenseById,
@@ -9,10 +11,10 @@ const {
   deleteExpense,
 } = require("../controllers/expenseController");
 
-router.get("/expenses", authMiddleware, getExpenses);
-router.get("/expenses/:id", authMiddleware, getExpenseById);
-router.post("/expenses", authMiddleware, createExpense);
-router.put("/expenses/:id", authMiddleware, updateExpense);
-router.delete("/expenses/:id", authMiddleware, deleteExpense);
+router.get("/expenses", authMiddleware, requirePermission(MODULES.EXPENSES, ACTIONS.VIEW), getExpenses);
+router.get("/expenses/:id", authMiddleware, requirePermission(MODULES.EXPENSES, ACTIONS.VIEW), getExpenseById);
+router.post("/expenses", authMiddleware, requirePermission(MODULES.EXPENSES, ACTIONS.CREATE), createExpense);
+router.put("/expenses/:id", authMiddleware, requirePermission(MODULES.EXPENSES, ACTIONS.EDIT), updateExpense);
+router.delete("/expenses/:id", authMiddleware, requirePermission(MODULES.EXPENSES, ACTIONS.DELETE), deleteExpense);
 
 module.exports = router;

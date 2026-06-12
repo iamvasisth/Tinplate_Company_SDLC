@@ -7,6 +7,10 @@ const ensureColumns = async () => {
     `ALTER TABLE quotes ADD COLUMN IF NOT EXISTS project_id INTEGER`,
     `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT 0`,
     `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) DEFAULT 'flat'`,
+    // Snapshot columns – store item data at the time of quoting so it's preserved if item is later edited/deleted
+    `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(255)`,
+    `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS hsn_code VARCHAR(50)`,
+    `ALTER TABLE quote_items ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`,
   ];
   for (const sql of alterStatements) {
     try { await pool.query(sql); } catch (_) { /* column may already exist */ }
@@ -41,7 +45,10 @@ const getQuoteById = async (req, res) => {
     }
 
     const itemsResult = await pool.query(
-      `SELECT qi.*, i.name as item_name
+      `SELECT qi.*,
+              COALESCE(qi.item_name, i.name) AS item_name,
+              COALESCE(qi.hsn_code, i.hsn_code)  AS hsn_code,
+              COALESCE(qi.unit, i.unit)            AS unit
        FROM quote_items qi
        LEFT JOIN items i ON qi.item_id = i.id
        WHERE qi.quote_id = $1`,
@@ -118,11 +125,14 @@ const createQuote = async (req, res) => {
 
         await client.query(
           `INSERT INTO quote_items
-           (quote_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+           (quote_id, item_id, item_name, hsn_code, unit, description, quantity, unit_price, tax_rate, discount, discount_type, total)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [
             quoteId,
             item.item_id || null,
+            item.item_name || null,
+            item.hsn_code || null,
+            item.unit || null,
             item.description || null,
             item.quantity || 1,
             item.unit_price || 0,
@@ -238,11 +248,14 @@ const updateQuote = async (req, res) => {
 
           await client.query(
             `INSERT INTO quote_items
-             (quote_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+             (quote_id, item_id, item_name, hsn_code, unit, description, quantity, unit_price, tax_rate, discount, discount_type, total)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
             [
               id,
               item.item_id || null,
+              item.item_name || null,
+              item.hsn_code || null,
+              item.unit || null,
               item.description || null,
               item.quantity || 1,
               item.unit_price || 0,
@@ -294,7 +307,7 @@ const convertQuoteToInvoice = async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Fetch quote
+    // 1. Verify quote belongs to this user
     const quoteRes = await client.query(
       `SELECT * FROM quotes WHERE id = $1 AND user_id = $2`,
       [id, req.user.id]
@@ -305,77 +318,109 @@ const convertQuoteToInvoice = async (req, res) => {
     }
     const quote = quoteRes.rows[0];
 
-    // Fetch quote items
+    // 2. Ensure quote_id column exists on invoices (for duplicate prevention)
+    try {
+      await pool.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS quote_id INTEGER`);
+    } catch (_) {}
+
+    // 3. Duplicate prevention: check if invoice already exists for this quote
+    const dupCheck = await client.query(
+      `SELECT id FROM invoices WHERE quote_id = $1 AND user_id = $2 LIMIT 1`,
+      [id, req.user.id]
+    );
+    if (dupCheck.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(200).json({
+        message: "Invoice already exists for this quote",
+        invoiceId: dupCheck.rows[0].id,
+        alreadyConverted: true,
+      });
+    }
+
+    // 4. Fetch quote items (with snapshot fields)
     const qiRes = await client.query(
       `SELECT * FROM quote_items WHERE quote_id = $1`,
       [id]
     );
     const quoteItems = qiRes.rows;
 
-    // Generate invoice number
-    const invNumber = "INV-" + Date.now();
+    // 5. Generate invoice number
+    const today = new Date().toISOString().slice(0, 10);
+    const invNumber = `INV-${today.replace(/-/g, "")}-${Date.now().toString().slice(-4)}`;
 
-    // Ensure invoice columns exist
-    try {
-      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS salesperson_id INTEGER`);
-      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS project_id INTEGER`);
-      await client.query(`ALTER TABLE invoices ADD COLUMN IF NOT EXISTS balance_due NUMERIC(12,2) DEFAULT 0`);
-      await client.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount NUMERIC(10,2) DEFAULT 0`);
-      await client.query(`ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS discount_type VARCHAR(10) DEFAULT 'flat'`);
-    } catch (_) {}
+    // 6. Calculate due date = today + 15 days
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 15);
+    const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    // Create invoice from quote
+    // 7. Create invoice from quote data
     const invResult = await client.query(
-      `INSERT INTO invoices (customer_id, user_id, invoice_number, invoice_date, due_date, status, notes, terms, total_amount, balance_due, salesperson_id, project_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      `INSERT INTO invoices
+         (customer_id, user_id, invoice_number, invoice_date, due_date, status,
+          notes, terms, total_amount, balance_due,
+          salesperson_id, project_id, quote_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING *`,
       [
         quote.customer_id,
         req.user.id,
         invNumber,
-        new Date().toISOString().slice(0, 10),
-        null,
+        today,
+        dueDateStr,
         "draft",
-        quote.notes,
-        quote.terms,
+        quote.notes   || null,
+        quote.terms   || null,
         quote.total_amount,
-        quote.total_amount,
-        quote.salesperson_id || null,
-        quote.project_id || null,
+        quote.total_amount,     // balance_due starts equal to total
+        quote.salesperson_id    || null,
+        quote.project_id        || null,
+        id,                     // quote_id for duplicate prevention
       ]
     );
     const invoiceId = invResult.rows[0].id;
 
-    // Copy items
+    // 8. Copy quote items → invoice items (include all snapshot fields)
     for (const item of quoteItems) {
       await client.query(
-        `INSERT INTO invoice_items (invoice_id, item_id, description, quantity, unit_price, tax_rate, discount, discount_type, total)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        `INSERT INTO invoice_items
+           (invoice_id, item_id, item_name, hsn_code, unit,
+            description, quantity, unit_price, tax_rate,
+            discount, discount_type, total)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
           invoiceId,
-          item.item_id,
-          item.description,
-          item.quantity,
-          item.unit_price,
-          item.tax_rate,
-          item.discount || 0,
-          item.discount_type || "flat",
-          item.total,
+          item.item_id        || null,
+          item.item_name      || null,
+          item.hsn_code       || null,
+          item.unit           || null,
+          item.description    || null,
+          item.quantity       || 1,
+          item.unit_price     || 0,
+          item.tax_rate       || 0,
+          item.discount       || 0,
+          item.discount_type  || "flat",
+          item.total          || 0,
         ]
       );
     }
 
-    // Mark quote as invoiced
+    // 9. Mark quote as invoiced
     await client.query(
       `UPDATE quotes SET status = 'invoiced', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [id]
     );
 
     await client.query("COMMIT");
-    res.json({ message: "Quote converted to invoice", invoice: invResult.rows[0] });
+    res.json({
+      message: "Quote converted to invoice successfully",
+      invoiceId,
+      invoice: invResult.rows[0],
+      alreadyConverted: false,
+    });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("CONVERT QUOTE ERROR:", err);
-    res.status(500).json({ message: "Failed to convert quote" });
+    console.error("CONVERT QUOTE TO INVOICE ERROR:", err);
+    res.status(500).json({ message: "Failed to convert quote to invoice" });
   } finally {
     client.release();
   }

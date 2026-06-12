@@ -2,7 +2,9 @@
 
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/roleMiddleware');
+const { MODULES, ACTIONS } = require('../config/permissions');
 //const PDFDocument = require("pdfkit");
 const nodemailer = require("nodemailer");
 //const numberToWords = require("number-to-words");
@@ -16,11 +18,11 @@ const {
   deleteInvoice,
 } = require("../controllers/invoiceController");
 
-router.get("/invoices", authMiddleware, getInvoices);
-router.get("/invoices/:id", authMiddleware, getInvoiceById);
-router.post("/invoices", authMiddleware, createInvoice);
-router.put("/invoices/:id", authMiddleware, updateInvoice);
-router.delete("/invoices/:id", authMiddleware, deleteInvoice);
+router.get("/invoices", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.VIEW), getInvoices);
+router.get("/invoices/:id", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.VIEW), getInvoiceById);
+router.post("/invoices", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.CREATE), createInvoice);
+router.put("/invoices/:id", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.EDIT), updateInvoice);
+router.delete("/invoices/:id", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.DELETE), deleteInvoice);
 
 const ORG_NAME = "Tinplate Computer Training Center";
 const ORG_ADDRESS = "2nd Floor, Thakur Pyara Singh Road, Jamshedpur – 831001";
@@ -28,7 +30,7 @@ const ORG_EMAIL = "kumarrahulraj468@gmail.com";
 const ORG_COUNTRY = "India";
 
 // Inside the route, replace the whole PDF generation block with:
-router.post("/invoices/:id/send", authMiddleware, async (req, res) => {
+router.post("/invoices/:id/send", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.SEND), async (req, res) => {
   const { id } = req.params;
   const { to, subject, body, cc, bcc } = req.body;
 
@@ -108,7 +110,7 @@ router.post("/invoices/:id/send", authMiddleware, async (req, res) => {
   }
 });
 
-router.get("/invoices/:id/pdf", authMiddleware, async (req, res) => {
+router.get("/invoices/:id/pdf", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.EXPORT), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -150,7 +152,7 @@ router.get("/invoices/:id/pdf", authMiddleware, async (req, res) => {
 });
 
 // ================= GET INVOICES BY CUSTOMER ID =================
-router.get("/customers/:id/invoices", authMiddleware, async (req, res) => {
+router.get("/customers/:id/invoices", authMiddleware, requirePermission(MODULES.INVOICES, ACTIONS.EXPORT), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(

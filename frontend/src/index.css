@@ -10,3 +10,44 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+@media print {
+  /* Hide application UI elements */
+  .sidebar, .topbar, .app-sidebar, header.topbar, nav, .print-hide {
+    display: none !important;
+  }
+  
+  /* Reset layout margins for full page print */
+  body, main, .main-content, #root, .app-layout, .app-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: white !important;
+  }
+
+  /* Convert inputs and textareas to look like plain text */
+  input, textarea, select {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    resize: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #000 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+  }
+  
+  /* Hide labels if they are meant for editable forms but redundant in print */
+  .print-label {
+    display: none !important;
+  }
+
+  /* Ensure background colors in tables print properly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -1,321 +1,261 @@
-/* ================================================
-   Topbar.css – Zoho Books-style top utility bar
-   Fully responsive across all breakpoints
-   ================================================ */
+/* Topbar.css (Updates for Dropdowns) */
 
 .topbar {
-  height: 56px;
-  background: #202842;
-  padding: 0 20px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  position: sticky;
-  top: 0;
-  z-index: 15;
-  overflow: hidden;
+  padding: 0 20px;
+  height: 50px;
+  background-color: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  color: #333;
 }
 
-/* ── Search ── */
-.topbar-search {
-  width: clamp(180px, 30vw, 360px);
-  height: 38px;
-  border: 1px solid #3d4a6b;
-  background: #2a3352;
-  border-radius: 8px;
+.topbar-icon-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #64748b;
+  margin-right: 10px;
+}
+
+.topbar-left {
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  transition: border-color 0.2s, width 0.3s;
-  flex-shrink: 1;
-  min-width: 0;
+}
+
+.topbar-search {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 6px 12px;
+  width: 350px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .topbar-search:focus-within {
-  border-color: #2f80ed;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  border-color: #3b82f6;
+  background: #ffffff;
 }
 
 .topbar-search-icon {
-  color: #8892b0;
-  font-size: 16px;
-  flex-shrink: 0;
+  color: #94a3b8;
+  margin-right: 5px;
 }
 
 .topbar-search-input {
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
   width: 100%;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: #e0e4f0;
-  padding: 0 10px;
-  font-size: 13px;
-  min-width: 0;
+  font-size: 14px;
+  color: #1e293b;
 }
 
-.topbar-search-input::placeholder {
-  color: #6b7a9e;
+.global-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 8px;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  z-index: 2000;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
-/* ── Actions ── */
+.global-search-group {
+  padding: 8px 0 0 0;
+}
+
+.global-search-group-title {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  background: #f8fafc;
+}
+
+.global-search-item {
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s;
+}
+
+.global-search-item:hover {
+  background: #eff6ff;
+}
+
+.global-search-item-primary {
+  font-weight: 500;
+  color: #0f172a;
+}
+.global-search-item-secondary {
+  font-size: 12px;
+  color: #64748b;
+}
+
 .topbar-actions {
-  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: #c0c8e0;
-  white-space: nowrap;
-  flex-shrink: 0;
+  gap: 15px;
 }
 
 .topbar-trial-text {
   font-size: 13px;
-  color: #8892b0;
+  color: #2563eb;
+  font-weight: 500;
 }
 
-.topbar-subscribe-btn {
-  border: 0;
-  background: transparent;
-  color: #4fa1ff;
+.topbar-separator {
+  color: #cbd5e1;
+}
+
+/* Dropdown Container */
+.topbar-dropdown-container {
+  position: relative;
+}
+
+.topbar-org-name {
+  background: none;
+  border: none;
+  font-size: 14px;
   font-weight: 600;
-  font-size: 13px;
+  color: #1e293b;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: 4px;
   transition: background 0.2s;
 }
 
-.topbar-subscribe-btn:hover {
-  background: rgba(79, 161, 255, 0.1);
+.topbar-org-name:hover {
+  background: #f1f5f9;
 }
 
-.topbar-subscribe-btn:focus-visible {
-  outline: 2px solid #4fa1ff;
-  outline-offset: 2px;
-}
-
-.topbar-separator {
-  color: #3d4a6b;
-  font-size: 18px;
-}
-
-.topbar-org-name {
-  font-size: 13px;
-  color: #c0c8e0;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ── Plus button ── */
 .topbar-plus-btn {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 8px;
-  background: #2f80ed;
+  background: #2563eb;
   color: white;
-  font-size: 22px;
-  font-weight: 300;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 18px;
   cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 0.2s, transform 0.15s;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
-.topbar-plus-btn:hover {
-  background: #1a6bd4;
-  transform: scale(1.05);
-}
-
-.topbar-plus-btn:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 2px;
-}
-
-/* ── Icon buttons ── */
-.topbar-icon-btn {
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #8892b0;
-  font-size: 16px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
-
-.topbar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e0e4f0;
-}
-
-.topbar-icon-btn:focus-visible {
-  outline: 2px solid #56b4ff;
-  outline-offset: 2px;
-}
-
-/* ── Account button ── */
 .topbar-account-btn {
-  width: 34px;
-  height: 34px;
-  border: 0;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: #0f172a;
   color: white;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+/* Dropdown Menus */
+.topbar-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+  min-width: 220px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.org-menu {
+  right: auto;
+  left: 0;
+}
+
+.dropdown-header {
+  padding: 12px 15px;
+  font-size: 12px;
   font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f8fafc;
+}
+
+.profile-header {
+  padding: 15px;
+  background: #f8fafc;
+}
+
+.profile-header strong {
+  color: #0f172a;
   font-size: 14px;
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: transform 0.15s;
-  flex-shrink: 0;
 }
 
-.topbar-account-btn:hover {
-  transform: scale(1.08);
+.profile-role {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  display: inline-block;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-/* ── Logout button ── */
-.topbar-logout-btn {
-  border: 0;
-  background: #ef4444;
-  color: white;
-  padding: 7px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
+.dropdown-item {
+  padding: 12px 15px;
+  font-size: 14px;
+  color: #334155;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   transition: background 0.2s;
-  flex-shrink: 0;
 }
 
-.topbar-logout-btn:hover {
-  background: #dc2626;
+.dropdown-item:hover {
+  background: #f1f5f9;
 }
 
-.topbar-logout-btn:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 2px;
+.dropdown-item.active {
+  font-weight: 600;
+  color: #0f172a;
 }
 
-/* ================================================================
-   RESPONSIVE BREAKPOINTS
-   ================================================================ */
-
-/* ── Tablet: ≤ 1100px ── */
-@media (max-width: 1100px) {
-  .topbar {
-    height: auto;
-    min-height: 52px;
-    padding: 8px 16px;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .topbar-search {
-    width: 100%;
-    max-width: none;
-    order: 10;
-    margin-top: 4px;
-  }
-
-  .topbar-actions {
-    margin-left: auto;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .topbar-org-name {
-    max-width: 120px;
-  }
+.dropdown-check {
+  color: #16a34a;
 }
 
-/* ── Mobile: ≤ 768px ── */
-@media (max-width: 768px) {
-  .topbar {
-    padding: 8px 12px 8px 56px; /* leave space for hamburger */
-    min-height: 48px;
-    gap: 6px;
-  }
-
-  .topbar-trial-text,
-  .topbar-org-name,
-  .topbar-separator {
-    display: none;
-  }
-
-  .topbar-search {
-    height: 36px;
-    order: 10;
-  }
-
-  .topbar-search-input {
-    font-size: 12px;
-  }
-
-  .topbar-actions {
-    gap: 4px;
-  }
-
-  .topbar-subscribe-btn {
-    font-size: 12px;
-    padding: 3px 6px;
-  }
-
-  .topbar-plus-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
-  }
-
-  .topbar-icon-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 14px;
-  }
-
-  .topbar-account-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 12px;
-  }
-
-  .topbar-logout-btn {
-    padding: 5px 10px;
-    font-size: 12px;
-  }
+.dropdown-divider {
+  height: 1px;
+  background: #e2e8f0;
 }
 
-/* ── Very small screens: ≤ 480px ── */
-@media (max-width: 480px) {
-  .topbar {
-    padding: 6px 8px 6px 52px;
-    gap: 4px;
-  }
-
-  .topbar-subscribe-btn {
-    display: none;
-  }
-
-  /* Keep only plus + account + logout visible */
-  .topbar-icon-btn {
-    display: none;
-  }
-
-  .topbar-plus-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 18px;
-    border-radius: 6px;
-  }
-
-  .topbar-logout-btn {
-    padding: 4px 8px;
-    font-size: 11px;
-  }
+.text-danger {
+  color: #dc2626;
+}
+.text-danger:hover {
+  background: #fef2f2;
 }

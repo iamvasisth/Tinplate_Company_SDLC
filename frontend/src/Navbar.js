@@ -83,10 +83,18 @@ function Navbar() {
     >
       {/* Logo / Brand */}
       <div
-        style={{ fontWeight: "bold", fontSize: "20px", marginRight: "30px", cursor: "pointer" }}
+        style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          marginRight: "40px", 
+          cursor: "pointer",
+          userSelect: "none"
+        }}
         onClick={() => navigate("/dashboard")}
       >
-        ERP
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <img src={require('./eazzio-logo-dark.png')} alt="eAzzio BOOKS" style={{ height: "40px", objectFit: "contain", borderRadius: "4px" }} />
+        </div>
       </div>
 
       {/* Navigation items */}

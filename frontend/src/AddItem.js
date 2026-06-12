@@ -1,17 +1,49 @@
 /**
- * AddItem.js – Edit item (Zoho Books-style UI)
- * All existing logic preserved. Only UI/styling updated.
+ * AddItem.js – Zoho Books–style form for New / Edit item
+ * Dependencies: apiRequest, react-router-dom, react-hot-toast
  */
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { FormSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
+const BLUE = '#4a90e2';
+const BORDER_COLOR = '#e2e8f0';
+const TEXT_PRIMARY = '#1e293b';
+const TEXT_SECONDARY = '#64748b';
+const BG_PAGE = '#f8fafc';
+const BG_CARD = '#ffffff';
+const RADIUS = '8px';
+const SHADOW = '0 1px 4px rgba(0,0,0,0.06)';
+
+const inputStyle = {
+  width: '100%',
+  padding: '9px 12px',
+  borderRadius: '6px',
+  border: '1px solid #d1d5db',
+  boxSizing: 'border-box',
+  fontSize: '14px',
+  color: '#374151',
+  outline: 'none',
+  transition: 'border-color 0.15s',
+};
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '13px',
+  fontWeight: '500',
+  color: '#374151',
+  marginBottom: '6px',
+};
+
+// Predefined unit options
 const UNITS = [
   "pcs", "kg", "g", "gm", "ltr", "ml", "m", "cm", "mm",
   "box", "pack", "roll", "set", "nos", "hour", "day", "month"
 ];
 
+// Initial account lists
 const INITIAL_SALES_ACCOUNTS = [
   "Sales", "General Income", "Interest Income",
   "Late Fee Income", "Other Charges", "Shipping Charge"
@@ -25,82 +57,148 @@ const INITIAL_PURCHASE_ACCOUNTS = [
   "Salaries and Employee Wages", "Travel Expense", "Uncategorized"
 ];
 
-function AddItem() {
+function AddItem({ onSaveSuccess, onCancel, isModal }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
 
+  // ---- Dirty state ----
   const [dirty, setDirty] = useState(false);
+
+  // ---- Basic fields ----
   const [name, setName] = useState("");
   const [itemType, setItemType] = useState("Goods");
   const [unit, setUnit] = useState("");
   const [imageFile, setImageFile] = useState(null);
-  const [salesEnabled, setSalesEnabled] = useState(false);
+
+  // ---- Sales section ----
+  const [salesEnabled, setSalesEnabled] = useState(true);
   const [sellPrice, setSellPrice] = useState("");
-  const [salesAccount, setSalesAccount] = useState(INITIAL_SALES_ACCOUNTS[0]);
+  const [salesAccount, setSalesAccount] = useState("");
   const [salesDesc, setSalesDesc] = useState("");
-  const [salesAccounts, setSalesAccounts] = useState(INITIAL_SALES_ACCOUNTS);
+  const [salesAccounts, setSalesAccounts] = useState(() => {
+    const saved = localStorage.getItem('customSalesAccounts');
+    return saved ? JSON.parse(saved) : INITIAL_SALES_ACCOUNTS;
+  });
   const [addingSalesAccount, setAddingSalesAccount] = useState(false);
   const [newSalesAccount, setNewSalesAccount] = useState("");
-  const [purchaseEnabled, setPurchaseEnabled] = useState(false);
+
+  // ---- Purchase section ----
+  const [purchaseEnabled, setPurchaseEnabled] = useState(true);
   const [costPrice, setCostPrice] = useState("");
-  const [purchaseAccount, setPurchaseAccount] = useState(INITIAL_PURCHASE_ACCOUNTS[0]);
+  const [purchaseAccount, setPurchaseAccount] = useState("");
   const [purchaseDesc, setPurchaseDesc] = useState("");
-  const [purchaseAccounts, setPurchaseAccounts] = useState(INITIAL_PURCHASE_ACCOUNTS);
+  const [purchaseAccounts, setPurchaseAccounts] = useState(() => {
+    const saved = localStorage.getItem('customPurchaseAccounts');
+    return saved ? JSON.parse(saved) : INITIAL_PURCHASE_ACCOUNTS;
+  });
   const [addingPurchaseAccount, setAddingPurchaseAccount] = useState(false);
   const [newPurchaseAccount, setNewPurchaseAccount] = useState("");
   const [preferredVendor, setPreferredVendor] = useState("");
+
+  // ---- Vendors list ----
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
   const markDirty = useCallback(() => setDirty(true), []);
-  const handleChange = (setter) => (e) => { setter(e.target.value); markDirty(); };
-  const handleCheckbox = (setter) => (e) => { setter(e.target.checked); markDirty(); };
+
+  const handleChange = (setter) => (e) => {
+    setter(e.target.value);
+    markDirty();
+  };
+
+  const handleCheckbox = (setter) => (e) => {
+    setter(e.target.checked);
+    markDirty();
+  };
 
   useEffect(() => {
     const fetchVendors = async () => {
       try {
         const res = await apiRequest("/contacts?type=vendor");
-        if (res) setVendors(res.contacts);
-      } catch (err) { console.error("Failed to fetch vendors", err); }
+        if (res) setVendors(res.contacts || []);
+      } catch (err) {
+        console.error("Failed to fetch vendors", err);
+      }
     };
     fetchVendors();
   }, []);
 
+  const location = useLocation();
+  const cloneItem = location.state?.cloneItem;
+
   useEffect(() => {
-    if (!isEdit) return;
-    const fetchItem = async () => {
-      try {
-        const res = await apiRequest(`/items/${id}`);
-        if (!res?.item) return;
-        const item = res.item;
-        setName(item.name || "");
-        setItemType(item.item_type || "Goods");
-        setUnit(item.unit || "");
-        setSalesEnabled(!!(item.selling_price || item.sales_account));
-        setSellPrice(item.selling_price ? String(item.selling_price) : "");
-        setSalesAccount(item.sales_account || INITIAL_SALES_ACCOUNTS[0]);
-        setSalesDesc(item.description || "");
-        setPurchaseEnabled(!!(item.cost_price || item.purchase_account));
-        setCostPrice(item.cost_price ? String(item.cost_price) : "");
-        setPurchaseAccount(item.purchase_account || INITIAL_PURCHASE_ACCOUNTS[0]);
-        setPurchaseDesc(item.purchase_description || "");
-        setPreferredVendor(item.preferred_vendor_id ? String(item.preferred_vendor_id) : "");
-        if (item.sales_account && !INITIAL_SALES_ACCOUNTS.includes(item.sales_account)) {
-          setSalesAccounts(prev => prev.includes(item.sales_account) ? prev : [...prev, item.sales_account]);
+    if (isEdit) {
+      const fetchItem = async () => {
+        setFetching(true);
+        try {
+          const res = await apiRequest("/items/" + id);
+          if (!res?.item) return;
+          populateForm(res.item);
+          setDirty(false);
+        } catch (err) {
+          toast.error("Failed to load item");
+        } finally {
+          setFetching(false);
         }
-        if (item.purchase_account && !INITIAL_PURCHASE_ACCOUNTS.includes(item.purchase_account)) {
-          setPurchaseAccounts(prev => prev.includes(item.purchase_account) ? prev : [...prev, item.purchase_account]);
+      };
+      fetchItem();
+    } else if (cloneItem) {
+      populateForm(cloneItem);
+      setName((prev) => prev ? prev + " (Copy)" : "");
+      setDirty(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEdit, cloneItem]);
+
+  const populateForm = (item) => {
+    setName(item.name || "");
+    setItemType(item.item_type || "Goods");
+    setUnit(item.unit || "");
+
+    const hasSales = !!(item.selling_price || item.sales_account);
+    setSalesEnabled(hasSales);
+    setSellPrice(item.selling_price ? String(item.selling_price) : "");
+    setSalesDesc(item.description || "");
+
+    const hasPurchase = !!(item.cost_price || item.purchase_account);
+    setPurchaseEnabled(hasPurchase);
+    setCostPrice(item.cost_price ? String(item.cost_price) : "");
+    setPurchaseDesc(item.purchase_description || "");
+    setPreferredVendor(item.preferred_vendor_id ? String(item.preferred_vendor_id) : "");
+
+    if (item.sales_account) {
+      setSalesAccounts(prev => {
+        if (!prev.includes(item.sales_account)) {
+          const updated = [...prev, item.sales_account];
+          localStorage.setItem('customSalesAccounts', JSON.stringify(updated));
+          return updated;
         }
-        setDirty(false);
-      } catch (err) { toast.error("Failed to load item"); }
-    };
-    fetchItem();
-  }, [id, isEdit]);
+        return prev;
+      });
+      setSalesAccount(item.sales_account);
+    }
+
+    if (item.purchase_account) {
+      setPurchaseAccounts(prev => {
+        if (!prev.includes(item.purchase_account)) {
+          const updated = [...prev, item.purchase_account];
+          localStorage.setItem('customPurchaseAccounts', JSON.stringify(updated));
+          return updated;
+        }
+        return prev;
+      });
+      setPurchaseAccount(item.purchase_account);
+    }
+  };
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (dirty) { e.preventDefault(); e.returnValue = ""; }
+      if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -108,8 +206,13 @@ function AddItem() {
 
   const addSalesAccount = () => {
     if (!newSalesAccount.trim()) return;
-    setSalesAccounts([...salesAccounts, newSalesAccount.trim()]);
-    setSalesAccount(newSalesAccount.trim());
+    const newAccount = newSalesAccount.trim();
+    if (!salesAccounts.includes(newAccount)) {
+      const updated = [...salesAccounts, newAccount];
+      setSalesAccounts(updated);
+      localStorage.setItem('customSalesAccounts', JSON.stringify(updated));
+    }
+    setSalesAccount(newAccount);
     setNewSalesAccount("");
     setAddingSalesAccount(false);
     markDirty();
@@ -117,40 +220,58 @@ function AddItem() {
 
   const addPurchaseAccount = () => {
     if (!newPurchaseAccount.trim()) return;
-    setPurchaseAccounts([...purchaseAccounts, newPurchaseAccount.trim()]);
-    setPurchaseAccount(newPurchaseAccount.trim());
+    const newAccount = newPurchaseAccount.trim();
+    if (!purchaseAccounts.includes(newAccount)) {
+      const updated = [...purchaseAccounts, newAccount];
+      setPurchaseAccounts(updated);
+      localStorage.setItem('customPurchaseAccounts', JSON.stringify(updated));
+    }
+    setPurchaseAccount(newAccount);
     setNewPurchaseAccount("");
     setAddingPurchaseAccount(false);
     markDirty();
   };
 
   const handleSave = async () => {
-    if (!name.trim()) { toast.error("Item name is required"); return; }
+    if (!name.trim()) {
+      toast.error("Item name is required");
+      return;
+    }
     try {
       setLoading(true);
       const payload = {
-        name, item_type: itemType, unit,
+        name,
+        item_type: itemType,
+        unit,
         image_url: imageFile ? imageFile.name : "",
         selling_price: salesEnabled ? (parseFloat(sellPrice) || 0) : 0,
-        sales_account: salesEnabled ? salesAccount : null,
+        sales_account: salesEnabled ? (salesAccount || salesAccounts[0]) : null,
         description: salesEnabled ? salesDesc : "",
         purchase_description: purchaseEnabled ? purchaseDesc : "",
         cost_price: purchaseEnabled ? (parseFloat(costPrice) || 0) : 0,
-        purchase_account: purchaseEnabled ? purchaseAccount : null,
+        purchase_account: purchaseEnabled ? (purchaseAccount || purchaseAccounts[0]) : null,
         preferred_vendor_id: purchaseEnabled && preferredVendor ? parseInt(preferredVendor) : null,
       };
+
       if (isEdit) {
-        await apiRequest(`/items/${id}`, { method: "PUT", body: JSON.stringify(payload) });
+        await apiRequest("/items/" + id, { method: "PUT", body: JSON.stringify(payload) });
         toast.success("Item updated");
       } else {
         await apiRequest("/items", { method: "POST", body: JSON.stringify(payload) });
         toast.success("Item created");
       }
       setDirty(false);
-      navigate("/items");
+      
+      if (onSaveSuccess) {
+        onSaveSuccess();
+      } else {
+        navigate("/items");
+      }
     } catch (err) {
       toast.error(isEdit ? "Failed to update item" : "Failed to create item");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -158,336 +279,208 @@ function AddItem() {
       const leave = window.confirm("You have unsaved changes. Are you sure you want to cancel?");
       if (!leave) return;
     }
-    navigate("/items");
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate("/items");
+    }
   };
 
+  if (fetching) {
+    return (
+      <div style={{ maxWidth: "900px", margin: "auto", padding: "30px" }}>
+        <FormSkeleton fields={8} />
+      </div>
+    );
+  }
+
   return (
-    <div style={S.pageWrapper}>
+    <div style={isModal ? { padding: "10px", background: BG_CARD } : { maxWidth: "900px", margin: "auto", padding: "30px", background: BG_PAGE, minHeight: "100vh" }}>
       {/* Header */}
-      <div style={S.pageHeader}>
-        <div>
-          <h1 style={S.title}>{isEdit ? "Edit Item" : "New Item"}</h1>
-          <p style={S.subtitle}>
-            {isEdit ? "Update the item details below." : "Fill in the details to create a new item."}
-          </p>
+      {!isModal && (
+        <div style={{ display: "flex", alignItems: "center", marginBottom: "20px", paddingBottom: "15px", borderBottom: `1px solid ${BORDER_COLOR}` }}>
+          <button onClick={handleCancel} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "16px", color: TEXT_SECONDARY, marginRight: "15px", padding: 0 }}>
+            ← Back to Items
+          </button>
+          <h2 style={{ margin: 0, color: TEXT_PRIMARY }}>{isEdit ? "Edit Item" : "New Item"}</h2>
         </div>
-        <button onClick={handleCancel} style={S.backBtn}
-          onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
-          onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}>
-          ← Back
-        </button>
-      </div>
+      )}
 
-      {/* Info Banner */}
-      <div style={S.infoBanner}>
-        <span>💡</span>
-        <div>
-          <strong>Do you want to keep track of this item?</strong>{" "}
-          <span style={{ color: "#3b82f6" }}>Enable inventory tracking from settings if you want to maintain stock.</span>
+      <div style={isModal ? { background: BG_CARD } : { background: BG_CARD, border: `1px solid ${BORDER_COLOR}`, borderRadius: '10px', padding: '30px', boxShadow: SHADOW }}>
+        
+        {/* Type & Name */}
+        <div style={{ display: "flex", gap: "15px", marginBottom: "20px" }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Type</label>
+            <div style={{ display: "flex", gap: "15px", padding: "8px 0" }}>
+              <label style={{ display: "flex", alignItems: "center", fontSize: "14px", color: TEXT_PRIMARY, cursor: "pointer" }}>
+                <input type="radio" checked={itemType === "Goods"} onChange={() => { setItemType("Goods"); markDirty(); }} style={{ marginRight: "8px", accentColor: BLUE }} /> Goods
+              </label>
+              <label style={{ display: "flex", alignItems: "center", fontSize: "14px", color: TEXT_PRIMARY, cursor: "pointer" }}>
+                <input type="radio" checked={itemType === "Service"} onChange={() => { setItemType("Service"); markDirty(); }} style={{ marginRight: "8px", accentColor: BLUE }} /> Service
+              </label>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Form Layout */}
-      <div style={S.formLayout}>
-        {/* Left Panel */}
-        <div style={S.leftPanel}>
+        <div style={{ display: "flex", gap: "15px", marginBottom: "20px" }}>
+          <div style={{ flex: 2 }}>
+            <label style={{...labelStyle, color: '#d32f2f'}}>Name *</label>
+            <input value={name} onChange={handleChange(setName)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+          </div>
+          {itemType === "Goods" && (
+            <div style={{ flex: 1 }}>
+              <label style={labelStyle}>Unit</label>
+              <input
+                list="unit-list"
+                value={unit}
+                onChange={handleChange(setUnit)}
+                style={inputStyle}
+                placeholder="Select or type"
+                onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}
+              />
+              <datalist id="unit-list">
+                {UNITS.map(u => <option key={u} value={u} />)}
+              </datalist>
+            </div>
+          )}
+        </div>
 
-          {/* Basic Information */}
-          <div style={S.sectionCard}>
-            <h3 style={S.sectionTitle}>Basic Information</h3>
-            <div style={S.formGrid}>
-              <div style={S.formGroupFull}>
-                <label style={S.label}>Name <span style={{ color: "#ef4444" }}>*</span></label>
-                <input value={name} onChange={handleChange(setName)} placeholder="Enter item name"
-                  style={S.input}
-                  onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                  onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
+        {/* Image Dropzone - Using similar style to other fields but styled as dropzone */}
+        <div style={{ marginBottom: "30px" }}>
+          <label style={labelStyle}>Item Image</label>
+          <div 
+            style={{ 
+              border: `1px dashed #d1d5db`, 
+              borderRadius: RADIUS, 
+              padding: "20px", 
+              textAlign: "center", 
+              cursor: "pointer", 
+              background: "#fafafa" 
+            }}
+            onClick={() => document.getElementById("item-image").click()}
+          >
+            <div style={{ color: TEXT_SECONDARY, marginBottom: "8px" }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: "0 auto", display: "block", marginBottom: "10px" }}>
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              {imageFile ? imageFile.name : "Drag image here or click to browse"}
+            </div>
+            <input
+              type="file"
+              id="item-image"
+              style={{ display: "none" }}
+              onChange={(e) => { setImageFile(e.target.files[0]); markDirty(); }}
+              accept="image/*"
+            />
+          </div>
+        </div>
+
+        {/* Sales Information */}
+        <div style={{ marginBottom: "20px", borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: "20px" }}>
+          <label style={{ display: "flex", alignItems: "center", fontSize: "16px", fontWeight: "600", color: TEXT_PRIMARY, marginBottom: "15px", cursor: "pointer" }}>
+            <input type="checkbox" checked={salesEnabled} onChange={handleCheckbox(setSalesEnabled)} style={{ marginRight: "10px", width: "16px", height: "16px", accentColor: BLUE }} />
+            Sales Information
+          </label>
+          
+          {salesEnabled && (
+            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <label style={{...labelStyle, color: '#d32f2f'}}>Selling Price *</label>
+                <div style={{ display: "flex", alignItems: "stretch", marginBottom: "15px" }}>
+                  <span style={{ padding: "9px 12px", background: "#f8f9fa", border: "1px solid #d1d5db", borderRight: "none", borderRadius: "6px 0 0 6px", color: "#555", fontSize: "14px" }}>INR</span>
+                  <input type="number" value={sellPrice} onChange={handleChange(setSellPrice)} style={{...inputStyle, borderRadius: "0 6px 6px 0"}} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+                </div>
+                
+                <label style={labelStyle}>Description</label>
+                <textarea rows="3" value={salesDesc} onChange={handleChange(setSalesDesc)} style={{...inputStyle, resize: "vertical"}} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}></textarea>
               </div>
+              
+              <div style={{ flex: "1 1 300px" }}>
+                <label style={{...labelStyle, color: '#d32f2f'}}>Account *</label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "15px" }}>
+                  <select value={salesAccount || salesAccounts[0]} onChange={handleChange(setSalesAccount)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}>
+                    {salesAccounts.map(acc => (
+                      <option key={acc} value={acc}>{acc}</option>
+                    ))}
+                  </select>
+                  {!addingSalesAccount ? (
+                    <button type="button" onClick={() => setAddingSalesAccount(true)} style={{ padding: "0 12px", background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "18px", color: TEXT_SECONDARY }}>+</button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '5px', width: '250px' }}>
+                      <input value={newSalesAccount} onChange={handleChange(setNewSalesAccount)} style={inputStyle} placeholder="New Account" onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+                      <button type="button" onClick={addSalesAccount} style={{ padding: "0 12px", background: BLUE, color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>Add</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
-              <div style={S.formGroup}>
-                <label style={S.label}>Type</label>
-                <select value={itemType} onChange={handleChange(setItemType)} style={S.select}>
-                  <option value="Goods">Goods</option>
-                  <option value="Service">Service</option>
+        {/* Purchase Information */}
+        <div style={{ marginBottom: "20px", borderTop: `1px solid ${BORDER_COLOR}`, paddingTop: "20px" }}>
+          <label style={{ display: "flex", alignItems: "center", fontSize: "16px", fontWeight: "600", color: TEXT_PRIMARY, marginBottom: "15px", cursor: "pointer" }}>
+            <input type="checkbox" checked={purchaseEnabled} onChange={handleCheckbox(setPurchaseEnabled)} style={{ marginRight: "10px", width: "16px", height: "16px", accentColor: BLUE }} />
+            Purchase Information
+          </label>
+          
+          {purchaseEnabled && (
+            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <label style={{...labelStyle, color: '#d32f2f'}}>Cost Price *</label>
+                <div style={{ display: "flex", alignItems: "stretch", marginBottom: "15px" }}>
+                  <span style={{ padding: "9px 12px", background: "#f8f9fa", border: "1px solid #d1d5db", borderRight: "none", borderRadius: "6px 0 0 6px", color: "#555", fontSize: "14px" }}>INR</span>
+                  <input type="number" value={costPrice} onChange={handleChange(setCostPrice)} style={{...inputStyle, borderRadius: "0 6px 6px 0"}} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+                </div>
+                
+                <label style={labelStyle}>Description</label>
+                <textarea rows="3" value={purchaseDesc} onChange={handleChange(setPurchaseDesc)} style={{...inputStyle, resize: "vertical"}} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}></textarea>
+              </div>
+              
+              <div style={{ flex: "1 1 300px" }}>
+                <label style={{...labelStyle, color: '#d32f2f'}}>Account *</label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "15px" }}>
+                  <select value={purchaseAccount || purchaseAccounts[0]} onChange={handleChange(setPurchaseAccount)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}>
+                    {purchaseAccounts.map(acc => (
+                      <option key={acc} value={acc}>{acc}</option>
+                    ))}
+                  </select>
+                  {!addingPurchaseAccount ? (
+                    <button type="button" onClick={() => setAddingPurchaseAccount(true)} style={{ padding: "0 12px", background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", cursor: "pointer", fontSize: "18px", color: TEXT_SECONDARY }}>+</button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '5px', width: '250px' }}>
+                      <input value={newPurchaseAccount} onChange={handleChange(setNewPurchaseAccount)} style={inputStyle} placeholder="New Account" onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'} />
+                      <button type="button" onClick={addPurchaseAccount} style={{ padding: "0 12px", background: BLUE, color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer" }}>Add</button>
+                    </div>
+                  )}
+                </div>
+
+                <label style={labelStyle}>Preferred Vendor</label>
+                <select value={preferredVendor} onChange={handleChange(setPreferredVendor)} style={inputStyle} onFocus={e => e.target.style.borderColor = BLUE} onBlur={e => e.target.style.borderColor = '#d1d5db'}>
+                  <option value="">Select vendor</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id.toString()}>{v.name}</option>
+                  ))}
                 </select>
               </div>
-
-              <div style={S.formGroup}>
-                <label style={S.label}>Unit</label>
-                <input list="unit-list" value={unit} onChange={handleChange(setUnit)}
-                  placeholder="e.g. pcs, kg, box" style={S.input}
-                  onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                  onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
-                <datalist id="unit-list">
-                  {UNITS.map(u => <option key={u} value={u} />)}
-                </datalist>
-              </div>
-
-              <div style={S.formGroupFull}>
-                <label style={S.label}>Image</label>
-                <input type="file" accept="image/*"
-                  onChange={e => { setImageFile(e.target.files[0]); markDirty(); }}
-                  style={{ ...S.input, padding: "7px 13px", cursor: "pointer" }} />
-              </div>
             </div>
-          </div>
-
-          {/* Sales Information */}
-          <div style={S.sectionCard}>
-            <div style={S.toggleHeader}>
-              <h3 style={{ ...S.sectionTitle, margin: 0, border: "none", padding: 0 }}>Sales Information</h3>
-              <label style={S.toggleLabel}>
-                <input type="checkbox" checked={salesEnabled}
-                  onChange={handleCheckbox(setSalesEnabled)}
-                  style={{ accentColor: "#2563eb", width: "16px", height: "16px" }} />
-                Enable
-              </label>
-            </div>
-            {salesEnabled && (
-              <div style={{ marginTop: "20px" }}>
-                <div style={S.formGrid}>
-                  <div style={S.formGroup}>
-                    <label style={S.label}>Selling Price</label>
-                    <input type="number" value={sellPrice} onChange={handleChange(setSellPrice)}
-                      placeholder="0.00" style={S.input}
-                      onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                      onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
-                  </div>
-
-                  <div style={S.formGroup}>
-                    <label style={S.label}>Account</label>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                      <select value={salesAccount} onChange={handleChange(setSalesAccount)} style={{ ...S.select, flex: 1 }}>
-                        {salesAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
-                      </select>
-                      {!addingSalesAccount ? (
-                        <button onClick={() => setAddingSalesAccount(true)} style={S.addBtn}>+</button>
-                      ) : (
-                        <div style={{ display: "flex", gap: "5px" }}>
-                          <input value={newSalesAccount} onChange={e => setNewSalesAccount(e.target.value)}
-                            placeholder="Account name" style={{ ...S.input, width: "130px" }}
-                            onKeyDown={e => e.key === "Enter" && addSalesAccount()} />
-                          <button onClick={addSalesAccount} style={S.smallSaveBtn}>Add</button>
-                          <button onClick={() => { setAddingSalesAccount(false); setNewSalesAccount(""); }} style={S.smallCancelBtn}>✕</button>
-                        </div>
-                      )}
-                    </div>
-                    <small style={S.hint}>Sales transactions will be tracked under this account.</small>
-                  </div>
-
-                  <div style={S.formGroupFull}>
-                    <label style={S.label}>Description</label>
-                    <input value={salesDesc} onChange={handleChange(setSalesDesc)}
-                      placeholder="Optional sales description" style={S.input}
-                      onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                      onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Purchase Information */}
-          <div style={S.sectionCard}>
-            <div style={S.toggleHeader}>
-              <h3 style={{ ...S.sectionTitle, margin: 0, border: "none", padding: 0 }}>Purchase Information</h3>
-              <label style={S.toggleLabel}>
-                <input type="checkbox" checked={purchaseEnabled}
-                  onChange={handleCheckbox(setPurchaseEnabled)}
-                  style={{ accentColor: "#2563eb", width: "16px", height: "16px" }} />
-                Enable
-              </label>
-            </div>
-            {purchaseEnabled && (
-              <div style={{ marginTop: "20px" }}>
-                <div style={S.formGrid}>
-                  <div style={S.formGroup}>
-                    <label style={S.label}>Cost Price</label>
-                    <input type="number" value={costPrice} onChange={handleChange(setCostPrice)}
-                      placeholder="0.00" style={S.input}
-                      onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                      onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
-                  </div>
-
-                  <div style={S.formGroup}>
-                    <label style={S.label}>Account</label>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                      <select value={purchaseAccount} onChange={handleChange(setPurchaseAccount)} style={{ ...S.select, flex: 1 }}>
-                        {purchaseAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
-                      </select>
-                      {!addingPurchaseAccount ? (
-                        <button onClick={() => setAddingPurchaseAccount(true)} style={S.addBtn}>+</button>
-                      ) : (
-                        <div style={{ display: "flex", gap: "5px" }}>
-                          <input value={newPurchaseAccount} onChange={e => setNewPurchaseAccount(e.target.value)}
-                            placeholder="Account name" style={{ ...S.input, width: "130px" }}
-                            onKeyDown={e => e.key === "Enter" && addPurchaseAccount()} />
-                          <button onClick={addPurchaseAccount} style={S.smallSaveBtn}>Add</button>
-                          <button onClick={() => { setAddingPurchaseAccount(false); setNewPurchaseAccount(""); }} style={S.smallCancelBtn}>✕</button>
-                        </div>
-                      )}
-                    </div>
-                    <small style={S.hint}>Purchase transactions will be tracked under this account.</small>
-                  </div>
-
-                  <div style={S.formGroupFull}>
-                    <label style={S.label}>Description</label>
-                    <input value={purchaseDesc} onChange={handleChange(setPurchaseDesc)}
-                      placeholder="Optional purchase description" style={S.input}
-                      onFocus={e => Object.assign(e.target.style, S.inputFocus)}
-                      onBlur={e => Object.assign(e.target.style, S.inputBlur)} />
-                  </div>
-
-                  <div style={S.formGroupFull}>
-                    <label style={S.label}>Preferred Vendor</label>
-                    <select value={preferredVendor} onChange={handleChange(setPreferredVendor)} style={S.select}>
-                      <option value="">Select vendor</option>
-                      {vendors.map(v => <option key={v.id} value={v.id.toString()}>{v.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
+          )}
         </div>
 
-        {/* Right Panel — Summary */}
-        <div style={S.rightPanel}>
-          <div style={S.summaryCard}>
-            <h3 style={S.sectionTitle}>Quick Summary</h3>
-            <SummaryRow label="Name" value={name || "Not added"} />
-            <SummaryRow label="Type" value={itemType} />
-            <SummaryRow label="Selling" value={`₹${sellPrice || "0.00"}`} highlight />
-            <SummaryRow label="Cost" value={`₹${costPrice || "0.00"}`} />
-            <SummaryRow label="Sales On" value={salesEnabled ? "Yes" : "No"} />
-            <SummaryRow label="Purchase On" value={purchaseEnabled ? "Yes" : "No"} />
-          </div>
+        {/* Action Buttons */}
+        <div style={{ marginTop: "30px", paddingTop: "20px", borderTop: `1px solid ${BORDER_COLOR}`, display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+          <button onClick={handleCancel} style={{ padding: "10px 20px", background: "#fff", color: TEXT_PRIMARY, border: `1px solid #d1d5db`, borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "500" }}>Cancel</button>
+          <button onClick={handleSave} disabled={loading} style={{ padding: "10px 20px", background: BLUE, color: "#fff", border: "none", borderRadius: "6px", cursor: loading ? "not-allowed" : "pointer", fontSize: "14px", fontWeight: "500", opacity: loading ? 0.7 : 1 }}>
+            {loading ? "Saving..." : isEdit ? "Update" : "Save"}
+          </button>
         </div>
-      </div>
 
-      {/* Sticky Footer */}
-      <div style={S.footerBar}>
-        <button id="cancel-edit-btn" onClick={handleCancel} style={S.cancelBtn}
-          onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
-          onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}>
-          Cancel
-        </button>
-        <button id="save-edit-btn" onClick={handleSave} disabled={loading} style={S.saveBtn}
-          onMouseEnter={e => { e.currentTarget.style.background = "#1d4ed8"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "#2563eb"; }}>
-          {loading ? "Saving…" : isEdit ? "Update Item" : "Save Item"}
-        </button>
       </div>
     </div>
   );
 }
-
-function SummaryRow({ label, value, highlight }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f8fafc" }}>
-      <span style={{ fontSize: "13px", color: "#64748b" }}>{label}</span>
-      <span style={{ fontSize: "13px", fontWeight: highlight ? "700" : "600", color: highlight ? "#2563eb" : "#1e293b", textAlign: "right", maxWidth: "55%", wordBreak: "break-word" }}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-/* ── Styles ── */
-const S = {
-  pageWrapper: {
-    minHeight: "100vh",
-    background: "#f8fafc",
-    padding: "28px 32px",
-    paddingBottom: "90px",
-    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
-  },
-  pageHeader: {
-    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-    marginBottom: "18px", flexWrap: "wrap", gap: "12px",
-  },
-  title: { margin: 0, fontSize: "22px", fontWeight: "700", color: "#0f172a", letterSpacing: "-0.3px" },
-  subtitle: { margin: "5px 0 0", fontSize: "13px", color: "#64748b" },
-  backBtn: {
-    padding: "9px 16px", border: "1px solid #cbd5e1", background: "#ffffff",
-    color: "#334155", borderRadius: "8px", cursor: "pointer", fontWeight: "600",
-    fontSize: "13px", transition: "background 0.15s",
-  },
-  infoBanner: {
-    background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px",
-    padding: "12px 16px", color: "#1e40af", marginBottom: "22px",
-    display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "13.5px",
-  },
-  formLayout: { display: "grid", gridTemplateColumns: "1fr 280px", gap: "24px" },
-  leftPanel: { display: "flex", flexDirection: "column", gap: "20px" },
-  rightPanel: { display: "flex", flexDirection: "column", gap: "20px" },
-  sectionCard: {
-    background: "#ffffff", borderRadius: "12px", padding: "22px",
-    border: "1px solid #e2e8f0", boxShadow: "0 1px 6px rgba(15,23,42,0.05)",
-  },
-  sectionTitle: {
-    margin: "0 0 18px", fontSize: "15px", fontWeight: "700", color: "#0f172a",
-    paddingBottom: "12px", borderBottom: "1px solid #f1f5f9",
-  },
-  toggleHeader: {
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    paddingBottom: "12px", borderBottom: "1px solid #f1f5f9",
-  },
-  toggleLabel: {
-    display: "flex", alignItems: "center", gap: "8px", cursor: "pointer",
-    fontSize: "13px", fontWeight: "600", color: "#2563eb",
-  },
-  formGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" },
-  formGroup: { display: "flex", flexDirection: "column", gap: "6px" },
-  formGroupFull: { gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "6px" },
-  label: { fontSize: "13px", fontWeight: "600", color: "#475569" },
-  input: {
-    width: "100%", padding: "10px 13px", borderRadius: "8px", border: "1px solid #cbd5e1",
-    outline: "none", fontSize: "14px", color: "#0f172a", background: "#ffffff",
-    boxSizing: "border-box", transition: "border-color 0.15s, box-shadow 0.15s",
-  },
-  inputFocus: { borderColor: "#2563eb", boxShadow: "0 0 0 3px rgba(37,99,235,0.1)" },
-  inputBlur: { borderColor: "#cbd5e1", boxShadow: "none" },
-  select: {
-    width: "100%", padding: "10px 13px", borderRadius: "8px", border: "1px solid #cbd5e1",
-    outline: "none", fontSize: "14px", color: "#0f172a", background: "#ffffff",
-    boxSizing: "border-box", cursor: "pointer",
-  },
-  hint: { display: "block", color: "#94a3b8", fontSize: "12px", marginTop: "4px" },
-  addBtn: {
-    background: "#2563eb", color: "#fff", border: "none", borderRadius: "6px",
-    width: "34px", height: "34px", cursor: "pointer", fontSize: "18px",
-    fontWeight: "bold", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-  },
-  smallSaveBtn: {
-    background: "#16a34a", color: "#fff", border: "none", borderRadius: "6px",
-    padding: "5px 10px", cursor: "pointer", fontSize: "13px", fontWeight: "600",
-  },
-  smallCancelBtn: {
-    background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0",
-    borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontSize: "13px",
-  },
-  summaryCard: {
-    background: "#ffffff", borderRadius: "12px", padding: "20px",
-    border: "1px solid #e2e8f0", boxShadow: "0 1px 6px rgba(15,23,42,0.05)",
-  },
-  footerBar: {
-    position: "fixed", left: 0, right: 0, bottom: 0, background: "#ffffff",
-    borderTop: "1px solid #e2e8f0", padding: "14px 32px",
-    display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px",
-    boxShadow: "0 -4px 20px rgba(15,23,42,0.08)", zIndex: 1000,
-  },
-  cancelBtn: {
-    padding: "10px 22px", border: "1px solid #cbd5e1", background: "#ffffff",
-    color: "#334155", borderRadius: "8px", cursor: "pointer", fontWeight: "600",
-    fontSize: "14px", transition: "background 0.15s",
-  },
-  saveBtn: {
-    padding: "10px 24px", border: "none", background: "#2563eb", color: "#ffffff",
-    borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px",
-    boxShadow: "0 4px 14px rgba(37,99,235,0.3)", transition: "all 0.18s ease",
-  },
-};
 
 export default AddItem;

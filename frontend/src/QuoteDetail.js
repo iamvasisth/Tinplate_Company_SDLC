@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "./api";
+import { DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 function QuoteDetail() {
@@ -11,6 +12,8 @@ function QuoteDetail() {
   const [items, setItems] = useState([]);
   const [customer, setCustomer] = useState(null);
   const [fetching, setFetching] = useState(true);
+  const [converting, setConverting] = useState(false);
+  const [invoicedId, setInvoicedId] = useState(null); // ID of linked invoice after conversion
 
   // Modals & Menu
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -51,12 +54,43 @@ function QuoteDetail() {
   };
 
   const handleConvertToInvoice = async () => {
+    if (!window.confirm("Convert this quote to an invoice? A new draft invoice will be created.")) return;
+    setConverting(true);
     try {
-      await apiRequest(`/quotes/${id}/convert-to-invoice`, { method: "POST" });
-      toast.success("Quote converted to invoice!");
-      navigate("/invoices");
+      const res = await apiRequest(`/quotes/${id}/convert-to-invoice`, { method: "POST" });
+      if (res?.alreadyConverted) {
+        toast("This quote was already converted. Opening existing invoice.", { icon: "ℹ️" });
+        navigate(`/invoices/${res.invoiceId}`);
+        return;
+      }
+      toast.success("Quote converted to invoice successfully!");
+      setQuote(prev => ({ ...prev, status: "invoiced" }));
+      setInvoicedId(res.invoiceId);
+      navigate(`/invoices/${res.invoiceId}`);
     } catch (err) {
-      toast.error("Failed to convert to invoice");
+      toast.error("Failed to convert quote to invoice");
+    } finally {
+      setConverting(false);
+    }
+  };
+
+  const handleConvertToSalesOrder = async () => {
+    if (!window.confirm("Convert this quote to a Sales Order?")) return;
+    setConverting(true);
+    try {
+      const res = await apiRequest(`/sales-orders/from-quote/${id}`, { method: "POST" });
+      if (res?.alreadyConverted) {
+        toast("Already converted. Opening existing Sales Order.", { icon: "ℹ️" });
+        navigate(`/sales-orders/${res.salesOrderId}/document`);
+        return;
+      }
+      toast.success("Quote converted to Sales Order!");
+      setQuote(prev => ({ ...prev, status: "accepted" }));
+      navigate(`/sales-orders/${res.salesOrderId}/document`);
+    } catch (err) {
+      toast.error("Failed to convert quote to Sales Order");
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -87,7 +121,11 @@ function QuoteDetail() {
     } catch (err) { toast.error("Failed to send email"); }
   };
 
-  if (fetching) return <div style={{ padding: "50px", textAlign: "center" }}>Loading…</div>;
+  if (fetching) return (
+    <div style={{ padding: "30px", maxWidth: "1200px", margin: "auto" }}>
+      <DetailSkeleton />
+    </div>
+  );
   if (!quote) return null;
 
   const total = parseFloat(quote.total_amount) || 0;
@@ -101,27 +139,55 @@ function QuoteDetail() {
 
   // Determine Ribbon color
   const statusColors = {
-    draft: "#8e99a3",
-    sent: "#f39c12",
+    draft:    "#8e99a3",
+    sent:     "#f39c12",
     accepted: "#2ecc71",
     declined: "#e74c3c",
-    expired: "#c0392b",
+    expired:  "#c0392b",
     invoiced: "#3498db",
   };
   const ribbonColor = statusColors[quote.status] || statusColors.draft;
 
+  const isInvoiced = quote.status === "invoiced";
+  const isDeclined = quote.status === "declined";
+  const canConvert = !isInvoiced && !isDeclined;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#f9f9fb" }}>
       {/* Top Action Bar */}
-      <div style={{ display: "flex", gap: "10px", padding: "15px 30px", background: "#fff", borderBottom: "1px solid #e2e8f0", alignItems: "center" }}>
+      <div className="print-hide" style={{ display: "flex", gap: "10px", padding: "15px 30px", background: "#fff", borderBottom: "1px solid #e2e8f0", alignItems: "center" }}>
         <h2 style={{ margin: "0 20px 0 0", fontSize: "18px" }}>{quote.quote_number || `QT-000${quote.id}`}</h2>
         
         <button onClick={() => navigate(`/quotes/${id}/edit`)} style={actionBtn}>✎ Edit</button>
         <button onClick={openEmailModal} style={actionBtn}>✉ Send</button>
         <button onClick={() => window.print()} style={actionBtn}>📄 PDF/Print</button>
         
-        {quote.status === "accepted" && (
-          <button onClick={handleConvertToInvoice} style={{ ...actionBtn, background: "#2ecc71", color: "#fff", border: "none" }}>📄 Convert to Invoice</button>
+        {/* Convert to Invoice button – shown unless declined */}
+        {canConvert && (
+          <button
+            onClick={handleConvertToInvoice}
+            disabled={converting}
+            style={{ ...actionBtn, background: "#2ecc71", color: "#fff", border: "none", opacity: converting ? 0.7 : 1 }}
+          >
+            {converting ? "⏳ Converting..." : "🔄 Convert to Invoice"}
+          </button>
+        )}
+        {canConvert && (
+          <button
+            onClick={handleConvertToSalesOrder}
+            disabled={converting}
+            style={{ ...actionBtn, background: "#17a2b8", color: "#fff", border: "none", opacity: converting ? 0.7 : 1 }}
+          >
+            {converting ? "⏳ Converting..." : "🔄 Convert to Sales Order"}
+          </button>
+        )}
+        {isInvoiced && (
+          <button
+            onClick={() => invoicedId ? navigate(`/invoices/${invoicedId}`) : navigate("/invoices")}
+            style={{ ...actionBtn, background: "#3498db", color: "#fff", border: "none" }}
+          >
+            📄 View Invoice
+          </button>
         )}
         
         <div style={{ position: "relative" }}>
@@ -196,30 +262,58 @@ function QuoteDetail() {
                 <tr style={{ background: "#fdfdfd" }}>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "left" }}>#</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "left" }}>Item & Description</th>
+                  <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>HSN/SAC</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Qty</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Rate</th>
+                  <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Disc</th>
+                  <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Tax%</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {items.length > 0 ? items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>{idx + 1}</td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>
-                      {item.item_name || item.description || "—"}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {parseFloat(item.quantity).toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {parseFloat(item.unit_price).toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {(parseFloat(item.quantity) * parseFloat(item.unit_price)).toFixed(2)}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan={5} style={{ padding: "10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>No items</td></tr>
+                {items.length > 0 ? items.map((item, idx) => {
+                  const qty  = parseFloat(item.quantity)   || 0;
+                  const rate = parseFloat(item.unit_price) || 0;
+                  const disc = parseFloat(item.discount)   || 0;
+                  const discType = item.discount_type || "flat";
+                  const taxRate  = parseFloat(item.tax_rate) || 0;
+                  let lineAmt = qty * rate;
+                  if (discType === "percent") lineAmt -= lineAmt * (disc / 100);
+                  else lineAmt -= disc;
+                  const taxAmt = lineAmt * (taxRate / 100);
+                  const total  = lineAmt + taxAmt;
+
+                  return (
+                    <tr key={idx}>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>{idx + 1}</td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>
+                        <div style={{ fontWeight: "500" }}>{item.item_name || item.description || "—"}</div>
+                        {item.item_name && item.description && item.description !== item.item_name && (
+                          <div style={{ fontSize: "12px", color: "#64748b" }}>{item.description}</div>
+                        )}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "center", color: "#64748b" }}>
+                        {item.hsn_code || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {qty.toFixed(2)}{item.unit ? ` ${item.unit}` : ""}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {rate.toFixed(2)}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right", color: "#dc2626" }}>
+                        {disc > 0 ? (discType === "percent" ? `${disc}%` : `₹${disc.toFixed(2)}`) : "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {taxRate > 0 ? `${taxRate}%` : "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right", fontWeight: "500" }}>
+                        ₹{total.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr><td colSpan={8} style={{ padding: "10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>No items</td></tr>
                 )}
               </tbody>
             </table>

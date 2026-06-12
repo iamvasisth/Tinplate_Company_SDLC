@@ -5,6 +5,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton, DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 const ORG_NAME = "Tinplate Computer Training Center";
@@ -180,7 +181,7 @@ function Invoices() {
         </select>
       </div>
 
-      {loading ? <p>Loading...</p> : filteredInvoices.length === 0 ? (
+      {loading ? <TableSkeleton columns={5} rows={4} /> : filteredInvoices.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px", color: "gray" }}>
           <p>No invoices found.</p>
           <button onClick={() => navigate("/invoices/new")} style={{ ...primaryBtn, marginTop: "15px" }}>+ New Invoice</button>
@@ -207,7 +208,9 @@ function Invoices() {
                 {expandedId === inv.id && (
                   <tr><td colSpan={5} style={{ padding: 0 }}>
                     {expandedLoading ? (
-                      <div style={{ padding: "20px", background: "#f9fafb", textAlign: "center" }}>Loading...</div>
+                      <div style={{ padding: "30px", background: "#f9fafb" }}>
+                        <DetailSkeleton />
+                      </div>
                     ) : expandedInvoice ? (
                       <div style={{ padding: "20px 25px", background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.03)" }}>
                         {/* Action buttons */}

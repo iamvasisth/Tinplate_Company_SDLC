@@ -152,10 +152,6 @@
   border-radius: 4px;
 }
 
-.sidebar-menu-block {
-  /* Container for each menu item + possible submenu */
-}
-
 .sidebar-menu-btn {
   width: 100%;
   min-height: 42px;

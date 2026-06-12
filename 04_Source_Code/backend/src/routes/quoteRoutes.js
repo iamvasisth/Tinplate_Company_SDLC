@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const authMiddleware = require("../middleware/authMiddleware");
+const authMiddleware = require('../middleware/authMiddleware');
+const { requirePermission } = require('../middleware/roleMiddleware');
+const { MODULES, ACTIONS } = require('../config/permissions');
 const pool = require("../config/db");
 
 // ----- Organisation details (used in PDF & email) -----
@@ -24,17 +26,17 @@ const {
 } = require("../controllers/quoteController");
 
 // ================= CRUD routes =================
-router.get("/quotes", authMiddleware, getQuotes);
-router.get("/quotes/:id", authMiddleware, getQuoteById);
-router.post("/quotes", authMiddleware, createQuote);
-router.put("/quotes/:id", authMiddleware, updateQuote);
-router.delete("/quotes/:id", authMiddleware, deleteQuote);
+router.get("/quotes", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.VIEW), getQuotes);
+router.get("/quotes/:id", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.VIEW), getQuoteById);
+router.post("/quotes", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.CREATE), createQuote);
+router.put("/quotes/:id", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.EDIT), updateQuote);
+router.delete("/quotes/:id", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.DELETE), deleteQuote);
 
 // ================= Convert to Invoice =================
-router.post("/quotes/:id/convert-to-invoice", authMiddleware, convertQuoteToInvoice);
+router.post("/quotes/:id/convert-to-invoice", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.CREATE), convertQuoteToInvoice);
 
 // ================= Send Quote via Email (Brevo SMTP) =================
-router.post("/quotes/:id/send", authMiddleware, async (req, res) => {
+router.post("/quotes/:id/send", authMiddleware, requirePermission(MODULES.QUOTES, ACTIONS.SEND), async (req, res) => {
   const { id } = req.params;
   const { to, subject, body, cc, bcc } = req.body;
 

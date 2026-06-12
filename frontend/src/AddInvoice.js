@@ -6,7 +6,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router-dom";
 import { apiRequest } from "./api";
+import { FormSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
+import AddCustomer from "./AddCustomer";
 
 function AddInvoice() {
   const navigate = useNavigate();
@@ -23,9 +25,15 @@ function AddInvoice() {
   const [salespersonId, setSalespersonId] = useState("");
   const [projectId, setProjectId] = useState("");
 
+  // --- GST Fields ---
+  const [supplierState, setSupplierState] = useState("Jharkhand"); // default or fetch from org settings
+  const [placeOfSupply, setPlaceOfSupply] = useState("Jharkhand");
+  const [customerGstin, setCustomerGstin] = useState("");
+  const [gstType, setGstType] = useState("intra_state"); // intra_state or inter_state
+
   // --- Items ---
   const [items, setItems] = useState([
-    { item_id: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_type: "flat" }
+    { item_id: "", item_name: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_type: "flat", hsn_code: "", unit: "" }
   ]);
 
   // --- Dropdown data ---
@@ -34,6 +42,7 @@ function AddInvoice() {
   const [salespersons, setSalespersons] = useState([]);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
   // --- Modals ---
   const [showCustomerModal, setShowCustomerModal] = useState(false);
@@ -48,18 +57,24 @@ function AddInvoice() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [custRes, itemRes, spRes, projRes] = await Promise.all([
+        const [custRes, itemRes, spRes, projRes, orgRes] = await Promise.all([
           apiRequest("/customers"),
           apiRequest("/items"),
           apiRequest("/salespersons"),
           apiRequest("/projects"),
+          apiRequest("/organization-settings")
         ]);
         setCustomers(custRes?.customers || []);
         setCatalogItems(itemRes?.items || []);
         setSalespersons(spRes?.salespersons || []);
         setProjects(projRes?.projects || []);
 
+        if (orgRes?.settings?.state) {
+          setSupplierState(orgRes.settings.state);
+        }
+
         if (isEditMode) {
+          setFetching(true);
           const res = await apiRequest(`/invoices/${id}`);
           if (res?.invoice) {
             const inv = res.invoice;
@@ -70,26 +85,54 @@ function AddInvoice() {
             setTerms(inv.terms || "");
             setSalespersonId(inv.salesperson_id ? String(inv.salesperson_id) : "");
             setProjectId(inv.project_id ? String(inv.project_id) : "");
+            if (inv.supplier_state) setSupplierState(inv.supplier_state);
+            if (inv.place_of_supply) setPlaceOfSupply(inv.place_of_supply);
+            if (inv.customer_gstin) setCustomerGstin(inv.customer_gstin);
+            if (inv.gst_type) setGstType(inv.gst_type);
             if (res.items && res.items.length > 0) {
               setItems(res.items.map(item => ({
-                item_id: item.item_id ? String(item.item_id) : "",
-                description: item.description || "",
-                quantity: item.quantity || 1,
-                unit_price: item.unit_price || 0,
-                tax_rate: item.tax_rate || 0,
-                discount: item.discount || 0,
-                discount_type: item.discount_type || "flat"
+                item_id:       item.item_id       ? String(item.item_id) : "",
+                item_name:     item.item_name     || "",
+                description:   item.description   || "",
+                quantity:      item.quantity       || 1,
+                unit_price:    item.unit_price     || 0,
+                tax_rate:      item.tax_rate       || 0,
+                discount:      item.discount       || 0,
+                discount_type: item.discount_type  || "flat",
+                hsn_code:      item.hsn_code       || "",
+                unit:          item.unit           || "",
               })));
             }
           }
         }
       } catch (err) { console.error("Failed to load data", err); }
+      finally { setFetching(false); }
     };
     fetchAll();
   }, []);
 
+  // Update Place of Supply and GST Type when customer changes
+  useEffect(() => {
+    if (customerId) {
+      const cust = customers.find(c => String(c.id) === String(customerId));
+      if (cust && !isEditMode) {
+        if (cust.pan && cust.pan.length >= 15) setCustomerGstin(cust.pan); // Assuming PAN field holds GSTIN for now
+        // A real system would have a state field. We will mock it or leave it as manually entered.
+      }
+    }
+  }, [customerId, customers, isEditMode]);
+
+  // Update GST Type when states change
+  useEffect(() => {
+    if (supplierState.toLowerCase().trim() === placeOfSupply.toLowerCase().trim()) {
+      setGstType("intra_state");
+    } else {
+      setGstType("inter_state");
+    }
+  }, [supplierState, placeOfSupply]);
+
   const addItem = () => {
-    setItems([...items, { item_id: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_type: "flat" }]);
+    setItems([...items, { item_id: "", item_name: "", description: "", quantity: 1, unit_price: 0, tax_rate: 0, discount: 0, discount_type: "flat", hsn_code: "", unit: "" }]);
   };
   const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
   const updateItem = (index, field, value) => {
@@ -102,10 +145,17 @@ function AddInvoice() {
     if (itemId) {
       const ci = catalogItems.find(c => String(c.id) === String(itemId));
       if (ci) {
+        updated[index].item_name   = ci.name || "";
         updated[index].description = ci.description || ci.name || "";
-        updated[index].unit_price = ci.selling_price || 0;
-        updated[index].tax_rate = ci.tax_rate || 0;
+        updated[index].unit_price  = ci.selling_price || 0;
+        updated[index].tax_rate    = ci.tax_rate || 0;
+        updated[index].hsn_code    = ci.hsn_code || "";
+        updated[index].unit        = ci.unit || "";
       }
+    } else {
+      updated[index].item_name = "";
+      updated[index].hsn_code  = "";
+      updated[index].unit      = "";
     }
     setItems(updated);
   };
@@ -116,7 +166,31 @@ function AddInvoice() {
     if (item.discount_type === "percent") { amt -= amt * (disc / 100); } else { amt -= disc; }
     return amt;
   };
-  const calcLineTax = (item) => calcLineAmount(item) * ((parseFloat(item.tax_rate) || 0) / 100);
+
+  const getLineGst = (item) => {
+    const taxableAmt = calcLineAmount(item);
+    const rate = parseFloat(item.tax_rate) || 0;
+    let cgstRate = 0, sgstRate = 0, igstRate = 0;
+    
+    if (gstType === "intra_state") {
+      cgstRate = rate / 2;
+      sgstRate = rate / 2;
+    } else {
+      igstRate = rate;
+    }
+
+    return {
+      cgst_rate: cgstRate,
+      sgst_rate: sgstRate,
+      igst_rate: igstRate,
+      cgst_amount: taxableAmt * (cgstRate / 100),
+      sgst_amount: taxableAmt * (sgstRate / 100),
+      igst_amount: taxableAmt * (igstRate / 100),
+      tax_amount: taxableAmt * (rate / 100)
+    };
+  };
+
+  const calcLineTax = (item) => getLineGst(item).tax_amount;
 
   const subtotal = items.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0), 0);
   const totalDiscount = items.reduce((s, i) => {
@@ -124,7 +198,16 @@ function AddInvoice() {
     if (i.discount_type === "percent") return s + ((parseFloat(i.quantity) || 0) * (parseFloat(i.unit_price) || 0) * d / 100);
     return s + d;
   }, 0);
-  const totalTax = items.reduce((s, i) => s + calcLineTax(i), 0);
+  
+  let totalCGST = 0, totalSGST = 0, totalIGST = 0;
+  items.forEach(i => {
+    const gst = getLineGst(i);
+    totalCGST += gst.cgst_amount;
+    totalSGST += gst.sgst_amount;
+    totalIGST += gst.igst_amount;
+  });
+  
+  const totalTax = totalCGST + totalSGST + totalIGST;
   const grandTotal = subtotal - totalDiscount + totalTax;
 
   const handleSave = async () => {
@@ -141,14 +224,30 @@ function AddInvoice() {
             notes, terms,
             salesperson_id: salespersonId ? parseInt(salespersonId) : null,
             project_id: projectId ? parseInt(projectId) : null,
-            items: items.map(item => ({
-              ...item,
-              item_id: item.item_id ? parseInt(item.item_id) : null,
-              quantity: parseFloat(item.quantity) || 0,
-              unit_price: parseFloat(item.unit_price) || 0,
-              tax_rate: parseFloat(item.tax_rate) || 0,
-              discount: parseFloat(item.discount) || 0,
-            })),
+            supplier_state: supplierState,
+            place_of_supply: placeOfSupply,
+            customer_gstin: customerGstin,
+            gst_type: gstType,
+            items: items.map(item => {
+              const gst = getLineGst(item);
+              return {
+                ...item,
+                item_id:    item.item_id    ? parseInt(item.item_id) : null,
+                item_name:  item.item_name  || null,
+                hsn_code:   item.hsn_code   || null,
+                unit:       item.unit       || null,
+                quantity:   parseFloat(item.quantity)   || 0,
+                unit_price: parseFloat(item.unit_price) || 0,
+                tax_rate:   parseFloat(item.tax_rate)   || 0,
+                discount:   parseFloat(item.discount)   || 0,
+                cgst_rate: gst.cgst_rate,
+                cgst_amount: gst.cgst_amount,
+                sgst_rate: gst.sgst_rate,
+                sgst_amount: gst.sgst_amount,
+                igst_rate: gst.igst_rate,
+                igst_amount: gst.igst_amount
+              };
+            }),
           }),
         });
         toast.success("Invoice updated");
@@ -160,18 +259,34 @@ function AddInvoice() {
             customer_id: parseInt(customerId),
             invoice_date: invoiceDate,
             due_date: dueDate || null,
-            status: "draft",
+            status: "sent",
             notes, terms,
             salesperson_id: salespersonId ? parseInt(salespersonId) : null,
             project_id: projectId ? parseInt(projectId) : null,
-            items: items.map(item => ({
-              ...item,
-              item_id: item.item_id ? parseInt(item.item_id) : null,
-              quantity: parseFloat(item.quantity) || 0,
-              unit_price: parseFloat(item.unit_price) || 0,
-              tax_rate: parseFloat(item.tax_rate) || 0,
-              discount: parseFloat(item.discount) || 0,
-            })),
+            supplier_state: supplierState,
+            place_of_supply: placeOfSupply,
+            customer_gstin: customerGstin,
+            gst_type: gstType,
+            items: items.map(item => {
+              const gst = getLineGst(item);
+              return {
+                ...item,
+                item_id:    item.item_id    ? parseInt(item.item_id) : null,
+                item_name:  item.item_name  || null,
+                hsn_code:   item.hsn_code   || null,
+                unit:       item.unit       || null,
+                quantity:   parseFloat(item.quantity)   || 0,
+                unit_price: parseFloat(item.unit_price) || 0,
+                tax_rate:   parseFloat(item.tax_rate)   || 0,
+                discount:   parseFloat(item.discount)   || 0,
+                cgst_rate: gst.cgst_rate,
+                cgst_amount: gst.cgst_amount,
+                sgst_rate: gst.sgst_rate,
+                sgst_amount: gst.sgst_amount,
+                igst_rate: gst.igst_rate,
+                igst_amount: gst.igst_amount
+              };
+            }),
           }),
         });
         toast.success("Invoice created");
@@ -181,18 +296,15 @@ function AddInvoice() {
     finally { setLoading(false); }
   };
 
-  const handleSaveCustomer = async () => {
-    if (!newCust.display_name) { toast.error("Customer name required"); return; }
-    try {
-      const res = await apiRequest("/customers", { method: "POST", body: JSON.stringify({
-        customer_type: newCust.customer_type, display_name: newCust.display_name, company_name: newCust.company_name,
-        email: newCust.email, phone: newCust.phone, pan: newCust.pan,
-        addresses: [{ type: "billing", address_line1: newCust.billing_address }, { type: "shipping", address_line1: newCust.shipping_address }],
-      })});
-      if (res?.customer) { setCustomers(prev => [...prev, res.customer]); setCustomerId(String(res.customer.id)); toast.success("Customer created"); }
-      setShowCustomerModal(false);
-      setNewCust({ customer_type: "Business", display_name: "", company_name: "", email: "", phone: "", billing_address: "", shipping_address: "", pan: "" });
-    } catch (err) { toast.error("Failed to create customer"); }
+  const handleSaveCustomerSuccess = (newCustomer) => {
+    if (newCustomer) {
+      setCustomers(prev => {
+        if (prev.some(c => c.id === newCustomer.id)) return prev;
+        return [...prev, newCustomer];
+      });
+      setCustomerId(String(newCustomer.id));
+    }
+    setShowCustomerModal(false);
   };
 
   const handleSaveSalesperson = async () => {
@@ -212,6 +324,15 @@ function AddInvoice() {
       setShowProjectModal(false); setNewProj({ project_name: "", customer_id: "", start_date: "", end_date: "", description: "", status: "active" });
     } catch (err) { toast.error("Failed to create project"); }
   };
+
+  if (fetching) {
+    return (
+      <div style={{ maxWidth: "960px", margin: "auto", padding: "30px" }}>
+        <h2 style={{ marginBottom: "25px" }}>{isEditMode ? "Edit Invoice" : "New Invoice"}</h2>
+        <FormSkeleton fields={8} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: "960px", margin: "auto", padding: "30px" }}>
@@ -251,6 +372,28 @@ function AddInvoice() {
         </div>
       </div>
 
+      {/* Row 1.5: GST Details */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "15px", marginBottom: "15px", background: "#f8fafc", padding: "15px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+        <div>
+          <label style={{fontSize: "13px", color:"#64748b"}}><strong>Supplier State</strong></label>
+          <input type="text" value={supplierState} onChange={e => setSupplierState(e.target.value)} style={inputStyle} />
+        </div>
+        <div>
+          <label style={{fontSize: "13px", color:"#64748b"}}><strong>Place of Supply (Customer State)</strong></label>
+          <input type="text" value={placeOfSupply} onChange={e => setPlaceOfSupply(e.target.value)} style={inputStyle} />
+        </div>
+        <div>
+          <label style={{fontSize: "13px", color:"#64748b"}}><strong>Customer GSTIN</strong></label>
+          <input type="text" value={customerGstin} onChange={e => setCustomerGstin(e.target.value)} placeholder="e.g. 20XXXXXXXXXX1Z1" style={inputStyle} />
+        </div>
+        <div>
+          <label style={{fontSize: "13px", color:"#64748b"}}><strong>GST Type (Auto)</strong></label>
+          <div style={{ padding: "8px", background: "#e2e8f0", borderRadius: "4px", fontSize: "14px", fontWeight: "600", color: "#334155" }}>
+            {gstType === "intra_state" ? "Intra-State (CGST+SGST)" : "Inter-State (IGST)"}
+          </div>
+        </div>
+      </div>
+
       {/* Dates */}
       <div style={{ display: "flex", gap: "15px", marginBottom: "15px" }}>
         <div style={{ flex: 1 }}><label><strong>Invoice Date</strong></label><input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} style={inputStyle} /></div>
@@ -277,9 +420,16 @@ function AddInvoice() {
               <tr key={idx} style={{ borderBottom: "1px solid #e2e8f0" }}>
                 <td style={tdStyle}>
                   <select value={item.item_id} onChange={e => handleItemSelect(idx, e.target.value)} style={{ ...inputStyle, minWidth: "120px" }}>
-                    <option value="">Select item</option>
+                    <option value="">— Select item —</option>
                     {catalogItems.map(ci => <option key={ci.id} value={ci.id}>{ci.name}</option>)}
                   </select>
+                  {/* HSN + unit info pills, shown when an item is linked */}
+                  {(item.hsn_code || item.unit) && (
+                    <div style={{ fontSize: "11px", color: "#64748b", marginTop: "3px", display: "flex", gap: "6px" }}>
+                      {item.hsn_code && <span style={{ background: "#f0f4ff", border: "1px solid #c7d2fe", borderRadius: "3px", padding: "1px 5px" }}>HSN: {item.hsn_code}</span>}
+                      {item.unit    && <span style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "3px", padding: "1px 5px" }}>Unit: {item.unit}</span>}
+                    </div>
+                  )}
                 </td>
                 <td style={tdStyle}><input type="text" placeholder="Description" value={item.description} onChange={e => updateItem(idx, "description", e.target.value)} style={{ ...inputStyle, minWidth: "140px" }} /></td>
                 <td style={tdStyle}><input type="number" min="0" value={item.quantity} onChange={e => updateItem(idx, "quantity", e.target.value)} style={{ ...inputStyle, width: "65px" }} /></td>
@@ -321,23 +471,15 @@ function AddInvoice() {
 
       {/* ===== NEW CUSTOMER MODAL ===== */}
       {showCustomerModal && (
-        <div style={modalOverlay}><div style={modalBox}>
-          <h3 style={{ marginTop: 0 }}>+ New Customer</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <div><label>Customer Type</label><select value={newCust.customer_type} onChange={e => setNewCust({ ...newCust, customer_type: e.target.value })} style={inputStyle}><option>Business</option><option>Individual</option></select></div>
-            <div><label>Display Name *</label><input value={newCust.display_name} onChange={e => setNewCust({ ...newCust, display_name: e.target.value })} style={inputStyle} /></div>
-            <div><label>Company Name</label><input value={newCust.company_name} onChange={e => setNewCust({ ...newCust, company_name: e.target.value })} style={inputStyle} /></div>
-            <div><label>Email</label><input type="email" value={newCust.email} onChange={e => setNewCust({ ...newCust, email: e.target.value })} style={inputStyle} /></div>
-            <div><label>Phone</label><input value={newCust.phone} onChange={e => setNewCust({ ...newCust, phone: e.target.value })} style={inputStyle} /></div>
-            <div><label>GSTIN / Tax Number</label><input value={newCust.pan} onChange={e => setNewCust({ ...newCust, pan: e.target.value })} style={inputStyle} /></div>
-            <div style={{ gridColumn: "1/-1" }}><label>Billing Address</label><input value={newCust.billing_address} onChange={e => setNewCust({ ...newCust, billing_address: e.target.value })} style={inputStyle} /></div>
-            <div style={{ gridColumn: "1/-1" }}><label>Shipping Address</label><input value={newCust.shipping_address} onChange={e => setNewCust({ ...newCust, shipping_address: e.target.value })} style={inputStyle} /></div>
+        <div style={modalOverlay}>
+          <div style={{ ...modalBox, width: "950px", maxWidth: "95vw", maxHeight: "90vh", padding: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 20px 0 20px" }}>
+              <h3 style={{ margin: 0 }}>+ New Customer</h3>
+              <button onClick={() => setShowCustomerModal(false)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "#666" }}>&times;</button>
+            </div>
+            <AddCustomer isModal={true} onSaveSuccess={handleSaveCustomerSuccess} onCancel={() => setShowCustomerModal(false)} />
           </div>
-          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "15px" }}>
-            <button onClick={() => setShowCustomerModal(false)} style={cancelBtnStyle}>Cancel</button>
-            <button onClick={handleSaveCustomer} style={primaryBtn}>Save Customer</button>
-          </div>
-        </div></div>
+        </div>
       )}
 
       {/* ===== NEW SALESPERSON MODAL ===== */}

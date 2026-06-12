@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "./api";
+import { DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 function InvoiceDetail() {
@@ -103,7 +104,11 @@ function InvoiceDetail() {
     } catch (err) { toast.error("Failed to record payment"); }
   };
 
-  if (fetching) return <div style={{ padding: "50px", textAlign: "center" }}>Loading…</div>;
+  if (fetching) return (
+    <div style={{ padding: "30px", maxWidth: "1200px", margin: "auto" }}>
+      <DetailSkeleton />
+    </div>
+  );
   if (!invoice) return null;
 
   const total = parseFloat(invoice.total_amount) || 0;
@@ -131,7 +136,7 @@ function InvoiceDetail() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#f9f9fb" }}>
       {/* Top Action Bar */}
-      <div style={{ display: "flex", gap: "10px", padding: "15px 30px", background: "#fff", borderBottom: "1px solid #e2e8f0", alignItems: "center" }}>
+      <div className="print-hide" style={{ display: "flex", gap: "10px", padding: "15px 30px", background: "#fff", borderBottom: "1px solid #e2e8f0", alignItems: "center" }}>
         <h2 style={{ margin: "0 20px 0 0", fontSize: "18px" }}>{invoice.invoice_number || `INV-000${invoice.id}`}</h2>
         
         <button onClick={() => navigate(`/invoices/${id}/edit`)} style={actionBtn}>✎ Edit</button>
@@ -192,16 +197,35 @@ function InvoiceDetail() {
               <div style={{ width: "50%" }}></div>
             </div>
 
-            {/* Bill To */}
-            <div style={{ background: "#f5f6f8", padding: "6px 10px", borderBottom: "1px solid #a3a3a3", fontSize: "13px", fontWeight: "bold" }}>
-              Bill To
-            </div>
-            <div style={{ padding: "10px", borderBottom: "1px solid #a3a3a3", fontSize: "13px", minHeight: "60px" }}>
-              <div style={{ color: "#2275d7", fontWeight: "bold", fontSize: "14px", marginBottom: "4px" }}>
-                {customer?.display_name || "Customer"}
+            {/* Bill To & GST Info */}
+            <div style={{ display: "flex", borderBottom: "1px solid #a3a3a3" }}>
+              <div style={{ width: "50%", borderRight: "1px solid #a3a3a3" }}>
+                <div style={{ background: "#f5f6f8", padding: "6px 10px", borderBottom: "1px solid #a3a3a3", fontSize: "13px", fontWeight: "bold" }}>
+                  Bill To
+                </div>
+                <div style={{ padding: "10px", fontSize: "13px", minHeight: "60px" }}>
+                  <div style={{ color: "#2275d7", fontWeight: "bold", fontSize: "14px", marginBottom: "4px" }}>
+                    {customer?.display_name || "Customer"}
+                  </div>
+                  {customer?.email && <div>{customer.email}</div>}
+                  {customer?.phone && <div>{customer.phone}</div>}
+                  {invoice.customer_gstin && <div style={{ marginTop: "5px", fontWeight: "bold" }}>GSTIN: {invoice.customer_gstin}</div>}
+                </div>
               </div>
-              {customer?.email && <div>{customer.email}</div>}
-              {customer?.phone && <div>{customer.phone}</div>}
+              
+              <div style={{ width: "50%" }}>
+                 <div style={{ background: "#f5f6f8", padding: "6px 10px", borderBottom: "1px solid #a3a3a3", fontSize: "13px", fontWeight: "bold" }}>
+                  GST Details
+                </div>
+                <div style={{ padding: "10px", fontSize: "13px" }}>
+                  <table style={{ width: "100%" }}>
+                    <tbody>
+                      <tr><td style={{ width: "120px", padding: "3px 0" }}>Place Of Supply</td><td>: {invoice.place_of_supply || "—"}</td></tr>
+                      <tr><td style={{ padding: "3px 0" }}>GST Type</td><td>: {invoice.gst_type === "intra_state" ? "Intra-State (CGST & SGST)" : invoice.gst_type === "inter_state" ? "Inter-State (IGST)" : "—"}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
             {/* Items Table */}
@@ -210,30 +234,100 @@ function InvoiceDetail() {
                 <tr style={{ background: "#fdfdfd" }}>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "left" }}>#</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "left" }}>Item & Description</th>
+                  <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>HSN/SAC</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Qty</th>
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Rate</th>
+                  <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Taxable</th>
+                  {invoice.gst_type === "intra_state" ? (
+                    <>
+                      <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>CGST</th>
+                      <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>SGST</th>
+                    </>
+                  ) : invoice.gst_type === "inter_state" ? (
+                    <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>IGST</th>
+                  ) : (
+                    <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Tax</th>
+                  )}
                   <th style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {items.length > 0 ? items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>{idx + 1}</td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>
-                      {item.item_name || item.description || "—"}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {parseFloat(item.quantity).toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {parseFloat(item.unit_price).toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
-                      {(parseFloat(item.quantity) * parseFloat(item.unit_price)).toFixed(2)}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan={5} style={{ padding: "10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>No items</td></tr>
+                {items.length > 0 ? items.map((item, idx) => {
+                  const qty      = parseFloat(item.quantity)   || 0;
+                  const rate     = parseFloat(item.unit_price) || 0;
+                  const disc     = parseFloat(item.discount)   || 0;
+                  const discType = item.discount_type || "flat";
+                  let taxable = parseFloat(item.taxable_value) || 0;
+                  
+                  // fallback calculation if taxable_value isn't populated
+                  if (!taxable) {
+                    taxable = qty * rate;
+                    if (discType === "percent") taxable -= taxable * (disc / 100);
+                    else taxable -= disc;
+                  }
+
+                  const cgstAmt = parseFloat(item.cgst_amount) || 0;
+                  const sgstAmt = parseFloat(item.sgst_amount) || 0;
+                  const igstAmt = parseFloat(item.igst_amount) || 0;
+                  
+                  // fallback for old records
+                  const fallbackTaxAmt = taxable * ((parseFloat(item.tax_rate) || 0) / 100);
+
+                  const rowTotal = taxable + cgstAmt + sgstAmt + igstAmt + (cgstAmt===0 && igstAmt===0 && item.tax_rate > 0 ? fallbackTaxAmt : 0);
+
+                  return (
+                    <tr key={idx}>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>{idx + 1}</td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3" }}>
+                        <div style={{ fontWeight: "500" }}>{item.item_name || item.description || "—"}</div>
+                        {item.item_name && item.description && item.description !== item.item_name && (
+                          <div style={{ fontSize: "12px", color: "#64748b" }}>{item.description}</div>
+                        )}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "center", color: "#64748b" }}>
+                        {item.hsn_code || "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {qty.toFixed(2)}{item.unit ? ` ${item.unit}` : ""}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {rate.toFixed(2)}
+                        {disc > 0 && <div style={{ fontSize: "10px", color: "#dc2626" }}>- {discType === "percent" ? `${disc}%` : `₹${disc.toFixed(2)}`}</div>}
+                      </td>
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                        {taxable.toFixed(2)}
+                      </td>
+                      
+                      {invoice.gst_type === "intra_state" ? (
+                        <>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                            <div>{cgstAmt.toFixed(2)}</div>
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>({parseFloat(item.cgst_rate || 0)}%)</div>
+                          </td>
+                          <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                            <div>{sgstAmt.toFixed(2)}</div>
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>({parseFloat(item.sgst_rate || 0)}%)</div>
+                          </td>
+                        </>
+                      ) : invoice.gst_type === "inter_state" ? (
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                            <div>{igstAmt.toFixed(2)}</div>
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>({parseFloat(item.igst_rate || 0)}%)</div>
+                        </td>
+                      ) : (
+                        <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right" }}>
+                            {fallbackTaxAmt.toFixed(2)}
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>({parseFloat(item.tax_rate || 0)}%)</div>
+                        </td>
+                      )}
+                      
+                      <td style={{ padding: "8px 10px", borderBottom: "1px solid #a3a3a3", textAlign: "right", fontWeight: "500" }}>
+                        ₹{rowTotal.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                }) : (
+                  <tr><td colSpan={10} style={{ padding: "10px", borderBottom: "1px solid #a3a3a3", textAlign: "center" }}>No items</td></tr>
                 )}
               </tbody>
             </table>

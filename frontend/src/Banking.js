@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { apiRequest } from "./api";
+import { TableSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 function Banking() {
@@ -79,7 +80,7 @@ function Banking() {
         <button onClick={() => setShowAddModal(true)} style={primaryBtn}>+ Add Account</button>
       </div>
 
-      {loading ? <p>Loading...</p> : accounts.length === 0 ? (
+      {loading ? <TableSkeleton columns={5} rows={4} /> : accounts.length === 0 ? (
         <p>No bank accounts yet.</p>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
@@ -116,7 +117,7 @@ function Banking() {
       {selectedAccount && (
         <div style={{ marginTop: "30px" }}>
           <h3>Transactions – {selectedAccount.account_name}</h3>
-          {txLoading ? <p>Loading...</p> : transactions.length === 0 ? <p>No transactions yet.</p> : (
+          {txLoading ? <TableSkeleton columns={5} rows={3} /> : transactions.length === 0 ? <p>No transactions yet.</p> : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
               <thead>
                 <tr style={{ background: "#f1f5f9", textAlign: "left" }}>

@@ -7,6 +7,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import toast from "react-hot-toast";
 import "./Auth.css";
+import RuppLogo from "./components/RuppLogo";
 
 function Register() {
   const [fullName, setFullName] = useState("");
@@ -61,14 +62,13 @@ function Register() {
   return (
     <div className="auth-page register-page">
       <div className="register-wrapper">
-        <div className="register-brand">
-          <span className="register-book-icon"></span>
-          <span>RUPP Books</span>
+        <div className="register-brand" style={{ justifyContent: "center" }}>
+          <RuppLogo height="48px" />
         </div>
 
         <h1 className="register-title">Create your account</h1>
         <p className="register-subtitle">
-          Get started with RUPP Books in just a few minutes
+          Get started with eAzzio BOOKS in just a few minutes
         </p>
 
         <div className="register-card">
