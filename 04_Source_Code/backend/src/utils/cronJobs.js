@@ -75,17 +75,17 @@ const processRecurringExpenses = async () => {
         
         // 1. Insert into expenses table
         const insertQuery = `
-          INSERT INTO expenses (expense_date, category, amount, user_id, notes) 
+          INSERT INTO expenses (expense_date, category, amount, user_id, description) 
           VALUES ($1, $2, $3, $4, $5)
         `;
-        const notes = expense.notes ? `[Auto-Generated Recurring Expense]\n${expense.notes}` : `[Auto-Generated Recurring Expense] ${expense.expense_name}`;
+        const descriptionText = expense.notes ? `[Auto-Generated Recurring Expense]\n${expense.notes}` : `[Auto-Generated Recurring Expense] ${expense.expense_name}`;
         
         await pool.query(insertQuery, [
           nextDueDate.toISOString().split('T')[0],
           expense.category,
           expense.amount,
           expense.created_by,
-          notes
+          descriptionText
         ]);
 
         // 2. Update last_processed_date
