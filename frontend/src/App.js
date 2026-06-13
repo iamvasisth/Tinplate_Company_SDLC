@@ -142,6 +142,7 @@ function App() {
           <Route path="/invoices/:id/document" element={<ProtectedRoute module={MODULES.INVOICES}><InvoiceDocument /></ProtectedRoute>} />
           <Route path="/expenses" element={<ProtectedRoute module={MODULES.EXPENSES}><Expenses /></ProtectedRoute>} />
           <Route path="/expenses/new" element={<ProtectedRoute module={MODULES.EXPENSES} action={ACTIONS.CREATE}><AddExpense /></ProtectedRoute>} />
+          <Route path="/expenses/:id/edit" element={<ProtectedRoute module={MODULES.EXPENSES} action={ACTIONS.EDIT}><AddExpense /></ProtectedRoute>} />
           <Route path="/projected-payments" element={<ProtectedRoute module={MODULES.BANKING}><ProjectedPayments /></ProtectedRoute>} />
           <Route path="/projected-expenses" element={<ProtectedRoute module={MODULES.EXPENSES}><ProjectedExpenses /></ProtectedRoute>} />
           <Route path="/import_more" element={<ImportMore />} />

@@ -43,7 +43,7 @@ function Documents() {
   const handleView = async (doc) => {
     try {
       const toastId = toast.loading("Loading document...");
-      const res = await fetch(`http://localhost:5000/api/documents/${doc.id}/download`, {
+      const res = await fetch(`http://localhost:5001/api/documents/${doc.id}/download`, {
         credentials: 'include'
       });
       toast.dismiss(toastId);

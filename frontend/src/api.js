@@ -4,7 +4,7 @@
  */
 
 // CRA automatically reads .env — no dotenv import needed
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 export async function apiRequest(path, options = {}) {
   try {
