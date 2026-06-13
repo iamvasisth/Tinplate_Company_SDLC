@@ -3,9 +3,12 @@
  * dynamic income chart, column customization, etc.
  */
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton, DetailSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
+import { useAuth } from "./AuthContext";
+import { canAccess, MODULES, ACTIONS } from "./utils/permissions";
 
 
 const BLUE = '#4a90e2';
@@ -18,8 +21,19 @@ const RADIUS = '8px';
 const SHADOW = '0 1px 4px rgba(0,0,0,0.06)';
 
 // Minimal inline styles replacements for table
-const thStyle = { padding: "12px 16px", background: "#f8fafc", color: "#64748b", fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "left", borderBottom: "1px solid #f1f5f9" };
-const tdStyle = { padding: "12px 16px" };
+const thStyle = {
+  padding: "12px 14px",
+  borderBottom: "1px solid #eaecf0",
+  fontSize: "11px",
+  fontWeight: "600",
+  textTransform: "uppercase",
+  color: "#475569",
+  letterSpacing: "0.03em",
+};
+const tdStyle = {
+  padding: "12px 14px",
+  verticalAlign: "middle",
+};
 
 const ORG_NAME = "Tinplate Computer Training Center";
 const ORG_ADDRESS = "2nd Floor, Thakur Pyara Singh Road, Jamshedpur – 831001";
@@ -37,7 +51,11 @@ const ALL_COLUMNS = [
 ];
 
 function Customers() {
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParamsUrl = new URLSearchParams(location.search);
+  const searchQuery = searchParamsUrl.get("search") || "";
 
   const timeAgo = (dateString) => {
     if (!dateString) return "";
@@ -121,8 +139,6 @@ function Customers() {
 
   // PDF download loading state
   const [pdfLoading, setPdfLoading] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
 
   const StatusBadge = ({ isActive }) => (
     <span style={{
@@ -679,7 +695,9 @@ function Customers() {
     fontWeight: activeTab === name ? "bold" : "normal",
     color: activeTab === name ? "#4a90e2" : "#333",
     background: "none",
-    border: "none",
+    borderTop: "none",
+    borderLeft: "none",
+    borderRight: "none",
     borderBottom: activeTab === name ? "3px solid #4a90e2" : "3px solid transparent",
   });
 
@@ -699,592 +717,1162 @@ function Customers() {
     if (!visibleColumns[colKey]) return null;
     return <th style={thStyle}>{label}</th>;
   };
-
   return (
-    <div style={{ padding: "30px", maxWidth: "1200px", margin: "auto", background: BG_PAGE, minHeight: "100vh" }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <div>
-          <h2 style={{ fontSize: "24px", fontWeight: "700", color: TEXT_PRIMARY, margin: 0 }}>Customers</h2>
-          <p style={{ color: TEXT_SECONDARY, margin: "4px 0 0", fontSize: "14px" }}>Showing {filteredCustomers.length} customers</p>
-        </div>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: "6px", border: `1px solid ${BORDER_COLOR}`, outline: "none", color: TEXT_PRIMARY }}>
-            <option value="all">All Customers</option>
-            <option value="active">Active Customers</option>
-            <option value="inactive">Inactive Customers</option>
-          </select>
-          <button onClick={() => navigate("/customers/new")} style={{ background: BLUE, color: "#fff", borderRadius: "6px", padding: "10px 20px", border: "none", cursor: "pointer", fontWeight: "500" }}>
-            + New Customer
-          </button>
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", padding: "5px", color: TEXT_SECONDARY }}>☰</button>
-            {menuOpen && (
-              <div style={{ position: "absolute", right: 0, top: "100%", background: "#fff", border: `1px solid ${BORDER_COLOR}`, borderRadius: RADIUS, boxShadow: SHADOW, zIndex: 10, minWidth: "150px" }}>
-                <button style={{ width: "100%", padding: "10px", border: "none", background: "none", textAlign: "left", cursor: "pointer", borderBottom: `1px solid ${BORDER_COLOR}` }} onClick={handleRefresh}>🔄 Refresh</button>
-                <button style={{ width: "100%", padding: "10px", border: "none", background: "none", textAlign: "left", cursor: "pointer", borderBottom: `1px solid ${BORDER_COLOR}` }} onClick={handleImport}>📥 Import</button>
-                <div style={{ position: "relative" }}>
-                  <button style={{ width: "100%", padding: "10px", border: "none", background: "none", textAlign: "left", cursor: "pointer" }} onClick={() => setColumnsOpen(!columnsOpen)}>📋 Columns ▸</button>
-                  {columnsOpen && (
-                    <div style={{ position: "absolute", left: "100%", top: 0, background: "#fff", border: `1px solid ${BORDER_COLOR}`, borderRadius: RADIUS, boxShadow: SHADOW, zIndex: 10, minWidth: "200px" }}>
-                      {ALL_COLUMNS.filter((c) => c.key !== "checkbox").map((col) => (
-                        <label key={col.key} style={{ display: "flex", alignItems: "center", padding: "8px 16px", cursor: "pointer" }}>
-                          <input type="checkbox" checked={visibleColumns[col.key] || false} onChange={() => setVisibleColumns((prev) => ({ ...prev, [col.key]: !prev[col.key] }))} />
-                          <span style={{ marginLeft: "8px", fontSize: "14px" }}>{col.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
+    <div style={{ background: "#f8fafc", minHeight: "100vh", fontFamily: "system-ui, -apple-system, sans-serif", color: "#1d2939" }}>
+      <style>{`
+        .premium-input {
+          border: 1px solid #d0d5dd;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .premium-input:focus {
+          border-color: #006ee6 !important;
+          box-shadow: 0 0 0 4px rgba(0, 110, 230, 0.12) !important;
+        }
+        .tab-btn {
+          padding: 12px 18px;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 13px;
+          color: #667085;
+          background: none;
+          border: none;
+          border-bottom: 2px solid transparent;
+          transition: all 0.15s ease;
+          outline: none;
+        }
+        .tab-btn:hover {
+          color: #1d2939;
+        }
+        .tab-btn.active {
+          color: #006ee6;
+          border-bottom-color: #006ee6;
+          font-weight: 600;
+        }
+        .hover-bg:hover {
+          background-color: #f9fafb !important;
+        }
+        .timeline-line {
+          position: absolute;
+          left: 17px;
+          top: 8px;
+          bottom: 8px;
+          width: 2px;
+          background: #eaecf0;
+        }
+        .timeline-node {
+          position: absolute;
+          left: 12px;
+          top: 4px;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          border: 2px solid #ffffff;
+          box-shadow: 0 0 0 2px #d0d5dd;
+          background: #ffffff;
+        }
+        .timeline-node.success { box-shadow: 0 0 0 2px #12b76a; background: #12b76a; }
+        .timeline-node.warning { box-shadow: 0 0 0 2px #f79009; background: #f79009; }
+        .timeline-node.primary { box-shadow: 0 0 0 2px #006ee6; background: #006ee6; }
+        .action-icon-btn {
+          border: 1px solid #d0d5dd;
+          background: #ffffff;
+          padding: 8px;
+          border-radius: 6px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #475569;
+          transition: all 0.15s ease;
+        }
+        .action-icon-btn:hover {
+          border-color: #98a2b3;
+          background: #f9fafb;
+          color: #1d2939;
+        }
+        .list-item-selected {
+          background-color: #f0f6ff !important;
+          border-left: 3.5px solid #006ee6 !important;
+        }
+        .list-item-normal {
+          border-left: 3.5px solid transparent;
+          cursor: pointer;
+          transition: background-color 0.15s ease;
+        }
+        .list-item-normal:hover {
+          background-color: #f8fafc;
+        }
+        .receivable-card {
+          background: #f8fafc;
+          border: 1px solid #eaecf0;
+          border-radius: 10px;
+          padding: 20px;
+          box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+        }
+        
+        /* Responsive Split Pane */
+        @media (max-width: 768px) {
+          .customers-main-container {
+            flex-direction: column !important;
+          }
+          .customers-left-pane {
+            width: 100% !important;
+            min-width: 100% !important;
+            border-right: none !important;
+            border-bottom: 1px solid #eaecf0 !important;
+            height: 400px;
+            flex: none !important;
+          }
+          .customers-right-pane {
+            width: 100% !important;
+          }
+          .customers-header-actions {
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+          }
+          .customers-detail-tabs {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-bottom: 5px;
+          }
+          .detail-header-row {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 15px;
+          }
+        }
+      `}</style>
+
+      {/* Main Container */}
+      <div className="customers-main-container" style={{ display: "flex", minHeight: "100vh" }}>
+        
+        {/* ==================== LEFT PANE (Only in Split View) ==================== */}
+        {expandedId !== null && (
+          <div className="customers-left-pane" style={{ width: "320px", minWidth: "320px", borderRight: "1px solid #eaecf0", background: "#ffffff", display: "flex", flexDirection: "column" }}>
+            
+            {/* Left Header */}
+            <div style={{ padding: "16px", borderBottom: "1px solid #eaecf0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ position: "relative" }}>
+                <button 
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  style={{ background: "none", border: "none", fontSize: "15px", fontWeight: "600", color: "#1d2939", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  {statusFilter === "all" ? "All Customers" : statusFilter === "active" ? "Active Customers" : "Inactive Customers"}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                
+                {menuOpen && (
+                  <div style={{ position: "absolute", left: 0, top: "100%", marginTop: "8px", background: "#ffffff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", zIndex: 100, minWidth: "180px" }}>
+                    <button style={{ width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: "13px", color: "#344054" }} onClick={() => { setStatusFilter("all"); setMenuOpen(false); }}>All Customers</button>
+                    <button style={{ width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: "13px", color: "#344054" }} onClick={() => { setStatusFilter("active"); setMenuOpen(false); }}>Active Customers</button>
+                    <button style={{ width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: "13px", color: "#344054" }} onClick={() => { setStatusFilter("inactive"); setMenuOpen(false); }}>Inactive Customers</button>
+                    <div style={{ borderTop: "1px solid #eaecf0", margin: "4px 0" }}></div>
+                    <button style={{ width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: "13px", color: "#344054" }} onClick={handleRefresh}>🔄 Refresh List</button>
+                    <button style={{ width: "100%", padding: "10px 14px", border: "none", background: "none", textAlign: "left", cursor: "pointer", fontSize: "13px", color: "#344054" }} onClick={handleImport}>📥 Import Contacts</button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: "20px" }}>
-        <div style={{ position: "relative", width: "100%" }}>
-          <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: TEXT_SECONDARY }}>🔍</span>
-          <input
-            type="text"
-            placeholder="Search by name, email or company..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: "100%", padding: "12px 12px 12px 40px", borderRadius: RADIUS, border: `1px solid ${BORDER_COLOR}`, outline: "none", fontSize: "14px", boxSizing: "border-box" }}
-            onFocus={e => e.target.style.borderColor = BLUE}
-            onBlur={e => e.target.style.borderColor = BORDER_COLOR}
-          />
-        </div>
-      </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {canAccess(user?.role, MODULES.CUSTOMERS, ACTIONS.CREATE) && (
+                  <button 
+                    onClick={() => navigate("/customers/new")} 
+                    style={{ background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", width: "28px", height: "28px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "16px", fontWeight: "600" }}
+                    title="Add Customer"
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+            </div>
 
-      {selected.length > 0 && (
-        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "15px", marginBottom: "20px" }}>
-          <span style={{ color: "#1e3a8a", fontWeight: "500" }}>{selected.length} customer(s) selected</span>
-          <button onClick={deleteSelected} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "4px", padding: "6px 12px", cursor: "pointer", fontSize: "13px" }}>Delete Selected</button>
-          <button onClick={() => setSelected([])} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "13px", textDecoration: "underline" }}>Cancel</button>
-        </div>
-      )}
+            {/* Left Search Bar */}
+            <div style={{ padding: "12px", borderBottom: "1px solid #eaecf0", background: "#f8fafc" }}>
+              <div style={{ position: "relative", width: "100%" }}>
+                <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#98a2b3", fontSize: "12px" }}>🔍</span>
+                <input
+                  type="text"
+                  placeholder="Search contacts..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    const newParams = new URLSearchParams(location.search);
+                    if (e.target.value) newParams.set("search", e.target.value);
+                    else newParams.delete("search");
+                    navigate({ search: newParams.toString() }, { replace: true });
+                  }}
+                  style={{ width: "100%", padding: "8px 8px 8px 30px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", boxSizing: "border-box", outline: "none", background: "#ffffff" }}
+                />
+              </div>
+            </div>
 
-      <div style={{ background: BG_CARD, borderRadius: RADIUS, boxShadow: SHADOW, border: `1px solid ${BORDER_COLOR}`, overflow: "hidden" }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⟳</div>
-            <p>Loading customers...</p>
-          </div>
-        ) : filteredCustomers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '80px 20px', color: '#94a3b8' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
-            <h3 style={{ color: '#374151', marginBottom: '8px' }}>No customers found</h3>
-            <p style={{ marginBottom: '20px' }}>{searchQuery ? 'No customers match your search.' : 'Start by adding your first customer.'}</p>
-            {!searchQuery && (
-              <button onClick={() => navigate('/customers/new')} style={{ background: BLUE, color: "#fff", borderRadius: "6px", padding: "10px 20px", border: "none", cursor: "pointer" }}>+ New Customer</button>
-            )}
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc", textAlign: "left" }}>
-                  {visibleColumns.checkbox && (
-                    <th style={{ ...thStyle, width: "40px" }}>
-                      <input type="checkbox" checked={selected.length === filteredCustomers.length && filteredCustomers.length > 0} onChange={toggleSelectAll} />
-                    </th>
-                  )}
-                  {renderHeader("name", "Name")}
-                  {renderHeader("company", "Company Name")}
-                  {renderHeader("email", "Email")}
-                  {renderHeader("workPhone", "Phone")}
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Actions</th>
-                  {renderHeader("receivables", "Receivables (BCY)")}
-                  {renderHeader("unusedCredits", "Unused Credits (BCY)")}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCustomers.map((c) => (
-                  <React.Fragment key={c.id}>
-                    <tr
-                      style={{ borderBottom: "1px solid #f1f5f9", background: selected.includes(c.id) ? "#eff6ff" : "transparent" }}
-                      onMouseEnter={e => e.currentTarget.style.background = selected.includes(c.id) ? "#eff6ff" : "#f8fafc"}
-                      onMouseLeave={e => e.currentTarget.style.background = selected.includes(c.id) ? "#eff6ff" : "transparent"}
+            {/* Left Scrollable List */}
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              {filteredCustomers.length === 0 ? (
+                <div style={{ padding: "40px 16px", textAlign: "center", color: "#667085", fontSize: "13px" }}>No customers found.</div>
+              ) : (
+                filteredCustomers.map((c) => {
+                  const initials = getCustomerName(c).split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+                  const isSelected = expandedId === c.id;
+                  
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => toggleExpand(c.id)}
+                      className={isSelected ? "list-item-selected" : "list-item-normal"}
+                      style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #eaecf0", background: "#ffffff" }}
                     >
-                      {visibleColumns.checkbox && (
-                        <td style={tdStyle}><input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelectOne(c.id)} /></td>
-                      )}
-                      {renderCell("name",
-                        <span style={{ color: BLUE, cursor: "pointer", fontWeight: "500" }} onClick={() => toggleExpand(c.id)}>{getCustomerName(c)}</span>
-                      )}
-                      {renderCell("company", c.company_name || "—")}
-                      {renderCell("email", c.email || "—")}
-                      {renderCell("workPhone", c.work_phone || c.phone || "—")}
-                      <td style={tdStyle}><StatusBadge isActive={c.is_active} /></td>
-                      <td style={tdStyle}>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          <button onClick={() => navigate('/customers/' + c.id)} style={{ padding: "4px 8px", background: "none", border: `1px solid ${BLUE}`, color: BLUE, borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>View</button>
-                          <button onClick={() => navigate('/customers/' + c.id + '/edit')} style={{ padding: "4px 8px", background: "none", border: "1px solid #94a3b8", color: "#64748b", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>Edit</button>
-                          <button onClick={() => handleSingleDelete(c.id)} style={{ padding: "4px 8px", background: "none", border: "1px solid #ef4444", color: "#ef4444", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>Delete</button>
-                          <button onClick={() => handleToggleStatus(c.id, c.is_active)} style={{ padding: "4px 8px", background: "none", border: "1px solid #d1d5db", color: "#475569", borderRadius: "4px", fontSize: "12px", cursor: "pointer" }}>
-                            {c.is_active ? 'Mark Inactive' : 'Mark Active'}
-                          </button>
+                      <input 
+                        type="checkbox" 
+                        checked={selected.includes(c.id)} 
+                        onChange={(e) => { e.stopPropagation(); toggleSelectOne(c.id); }} 
+                        style={{ cursor: "pointer" }} 
+                      />
+                      
+                      <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: isSelected ? "#006ee6" : "#f2f4f7", color: isSelected ? "#ffffff" : "#475569", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "600" }}>
+                        {initials || "C"}
+                      </div>
+                      
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: "#1d2939", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {getCustomerName(c)}
                         </div>
-                      </td>
-                      {renderCell("receivables", `₹${totalInvoiced.toFixed(2)}`)}
-                      {renderCell("unusedCredits", "₹0.00")}
-                    </tr>
-                    {expandedId === c.id && (
-                      <tr>
-                        <td colSpan={Object.values(visibleColumns).filter(Boolean).length + 2 || 1} style={{ padding: "0" }}>
-                          {expandedLoading ? (
-                            <div style={{ padding: "30px", background: "#f9fafb", textAlign: "center" }}>Loading details...</div>
-                          ) : expandedCustomer ? (
-                            <div style={{ padding: "20px 30px", background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.02)" }}>
-                              {/* Header */}
-                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "25px" }}>
-                                <div>
-                                  <h2 style={{ margin: 0 }}>{getCustomerName(expandedCustomer)}</h2>
-                                  <p style={{ color: "gray", margin: "5px 0 0" }}>{expandedCustomer.email}</p>
-                                  {!expandedCustomer.enable_portal && (
-                                    <button onClick={() => handleInvitePortal(c.id)} style={{ ...primaryBtn, marginTop: "10px", fontSize: "13px" }}>Invite to Portal</button>
-                                  )}
+                        <div style={{ fontSize: "11px", color: "#667085", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }}>
+                          {c.company_name || "No Company"}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: "#344054" }}>
+                          ₹{c.opening_balance ? parseFloat(c.opening_balance).toFixed(0) : "0"}
+                        </div>
+                        <div style={{ fontSize: "10px", color: c.is_active ? "#12b76a" : "#667085", fontWeight: "500", marginTop: "2px" }}>
+                          {c.is_active ? "Active" : "Inactive"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* ==================== RIGHT PANE / DETAIL OR FULL LIST ==================== */}
+        <div className="customers-right-pane" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          
+          {expandedId !== null ? (
+            // ==================== DETAIL VIEW MODE ====================
+            expandedLoading ? (
+              <div style={{ padding: "40px" }}><DetailSkeleton /></div>
+            ) : expandedCustomer ? (
+              <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#ffffff" }}>
+                
+                {/* Detail View Header Banner */}
+                <div className="detail-header-row" style={{ padding: "16px 24px", borderBottom: "1px solid #eaecf0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#ffffff" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "600", color: "#1d2939" }}>
+                      {getCustomerName(expandedCustomer)}
+                    </h2>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: activeStatus ? "#ecfdf5" : "#f2f4f7", border: `1px solid ${activeStatus ? "#a7f3d0" : "#d0d5dd"}`, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "500", color: activeStatus ? "#047857" : "#475569" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: activeStatus ? "#10b981" : "#6b7280" }}></span>
+                      {activeStatus ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  {/* Header Actions */}
+                  <div className="customers-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <button 
+                      onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} 
+                      style={{ padding: "8px 14px", background: "#ffffff", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", fontWeight: "600", color: "#344054", cursor: "pointer", outline: "none" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                      onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}
+                    >
+                      Edit
+                    </button>
+                    
+                    <button 
+                      className="action-icon-btn" 
+                      title="Attach File"
+                      onClick={() => toast("Attachments feature coming soon")}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                      </svg>
+                    </button>
+
+                    {/* New Transaction Dropdown */}
+                    <div style={{ position: "relative" }}>
+                      <button 
+                        onClick={() => setNewTransactionOpen(!newTransactionOpen)} 
+                        style={{ padding: "8px 14px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", outline: "none" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#0056b3"}
+                        onMouseLeave={e => e.currentTarget.style.background = "#006ee6"}
+                      >
+                        New Transaction
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+                      
+                      {newTransactionOpen && (
+                        <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "6px", background: "#ffffff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", zIndex: 100, minWidth: "160px" }}>
+                          <button style={menuItem} onClick={() => { setNewTransactionOpen(false); handleNewTransaction(expandedCustomer.id); }}>📄 Invoice</button>
+                          <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Payment page coming soon"); }}>💰 Payment</button>
+                          <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Expense page coming soon"); }}>📉 Expense</button>
+                          <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Project page coming soon"); }}>📂 Project</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* More Menu Dropdown */}
+                    <div style={{ position: "relative" }}>
+                      <button 
+                        onClick={() => setMoreOpen(!moreOpen)} 
+                        style={{ padding: "8px 14px", background: "#ffffff", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", fontWeight: "600", color: "#344054", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", outline: "none" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                        onMouseLeave={e => e.currentTarget.style.background = "#ffffff"}
+                      >
+                        More
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </button>
+
+                      {moreOpen && (
+                        <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "6px", background: "#ffffff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", zIndex: 100, minWidth: "185px" }}>
+                          <button style={menuItem} onClick={async () => {
+                            setMoreOpen(false);
+                            try {
+                              const newStatus = !activeStatus;
+                              await apiRequest(`/customers/${expandedCustomer.id}`, { method: "PUT", body: JSON.stringify({ is_active: newStatus }) });
+                              toast.success(newStatus ? "Customer activated" : "Customer deactivated");
+                              setActiveStatus(newStatus);
+                              const res = await apiRequest(`/customers/${expandedCustomer.id}`);
+                              if (res) setExpandedCustomer(res.customer);
+                              fetchCustomers();
+                              fetchActivities(expandedCustomer.id);
+                            } catch (err) { toast.error("Failed to update status"); }
+                          }}>
+                            {activeStatus ? "Mark as Inactive" : "Mark as Active"}
+                          </button>
+                          <button style={menuItem} onClick={() => { setMoreOpen(false); handleNewTransaction(expandedCustomer.id); }}>New Invoice</button>
+                          <button style={menuItem} onClick={() => { setMoreOpen(false); toast("Credit note page coming soon"); }}>New Credit Note</button>
+                          <button style={menuItem} onClick={() => { setMoreOpen(false); setActiveTab("Transactions"); }}>View All Transactions</button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Close Split View */}
+                    <button 
+                      onClick={() => setExpandedId(null)} 
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#98a2b3", display: "flex", padding: "4px", borderRadius: "4px", marginLeft: "6px" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#f2f4f7"}
+                      onMouseLeave={e => e.currentTarget.style.background = "none"}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Tabs Bar */}
+                <div style={{ padding: "0 24px", borderBottom: "1px solid #eaecf0", display: "flex", gap: "6px", background: "#ffffff" }}>
+                  {["Overview", "Comments", "Transactions", "Mails", "Statement"].map((tab) => (
+                    <button 
+                      key={tab} 
+                      onClick={() => setActiveTab(tab)} 
+                      className={`tab-btn ${activeTab === tab ? "active" : ""}`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Content Display Area */}
+                <div style={{ flex: 1, overflowY: "auto", padding: "24px", background: "#ffffff" }}>
+                  
+                  {/* ===== TAB: OVERVIEW ===== */}
+                  {activeTab === "Overview" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "32px", alignItems: "start" }}>
+                      
+                      {/* Left Column Details */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                        
+                        <div>
+                          <div style={{ fontSize: "12px", color: "#667085", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>Company Name</div>
+                          <div style={{ fontSize: "16px", fontWeight: "600", color: "#1d2939" }}>{expandedCustomer.company_name || "General store pvt ltd"}</div>
+                        </div>
+
+                        {/* Contact details card */}
+                        <div style={{ border: "1px solid #eaecf0", borderRadius: "10px", padding: "20px", display: "flex", gap: "16px", background: "#fcfcfd" }}>
+                          <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#e0f2fe", color: "#0369a1", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "600" }}>
+                            {getCustomerName(expandedCustomer).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "C"}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "14px", fontWeight: "600", color: "#1d2939", marginBottom: "4px" }}>{getCustomerName(expandedCustomer)}</div>
+                            <div style={{ fontSize: "13px", color: "#475569", display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                              <span>✉</span>
+                              <span>{expandedCustomer.email || "No Email Provided"}</span>
+                            </div>
+                            <div style={{ fontSize: "13px", color: "#475569", display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span>📞</span>
+                              <span>{expandedCustomer.work_phone || expandedCustomer.phone || "No Phone Provided"}</span>
+                            </div>
+                            
+                            {!expandedCustomer.enable_portal && (
+                              <button 
+                                onClick={() => handleInvitePortal(expandedCustomer.id)} 
+                                style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", fontSize: "12px", fontWeight: "600", padding: 0, marginTop: "12px", display: "flex", alignItems: "center", gap: "4px", outline: "none" }}
+                              >
+                                Invite to Portal →
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Addresses Card */}
+                        <div>
+                          <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Address</h4>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                            
+                            {/* Billing */}
+                            <div style={{ border: "1px solid #eaecf0", borderRadius: "8px", padding: "16px", background: "#ffffff" }}>
+                              <div style={{ fontSize: "12px", fontWeight: "600", color: "#667085", marginBottom: "8px" }}>BILLING ADDRESS</div>
+                              {billing ? (
+                                <div style={{ fontSize: "13px", color: "#344054", lineHeight: "1.5" }}>
+                                  <div style={{ fontWeight: "600" }}>{billing.attention}</div>
+                                  <div>{billing.address_line1}</div>
+                                  {billing.address_line2 && <div>{billing.address_line2}</div>}
+                                  <div>{billing.city}, {billing.state} {billing.pin_code}</div>
+                                  <div>{billing.country}</div>
+                                  {billing.phone && <div style={{ marginTop: "4px", color: "#667085" }}>Phone: {billing.phone}</div>}
+                                  <button onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", padding: 0, marginTop: "10px", fontSize: "12px", fontWeight: "500", textDecoration: "underline" }}>Edit Billing</button>
                                 </div>
-                                <div style={{ display: "flex", gap: "10px" }}>
-                                  <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={primaryBtn}>Edit</button>
-                                  <div style={{ position: "relative" }}>
-                                    <button onClick={() => setNewTransactionOpen(!newTransactionOpen)} style={{ ...primaryBtn, background: "#6c757d" }}>New Transaction ▾</button>
-                                    {newTransactionOpen && (
-                                      <div style={{ ...dropdownMenuStyle, right: 0, top: "100%", width: "180px" }}>
-                                        <button style={menuItem} onClick={() => { setNewTransactionOpen(false); handleNewTransaction(c.id); }}>📄 Invoice</button>
-                                        <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Payment feature coming soon"); }}>💰 Payment</button>
-                                        <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Expense feature coming soon"); }}>📉 Expense</button>
-                                        <button style={menuItem} onClick={() => { setNewTransactionOpen(false); toast("Project feature coming soon"); }}>📂 Project</button>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div style={{ position: "relative" }}>
-                                    <button onClick={() => setMoreOpen(!moreOpen)} style={secondaryBtn}>More ▾</button>
-                                    {moreOpen && (
-                                      <div style={{ ...dropdownMenuStyle, right: 0, top: "100%", width: "200px" }}>
-                                        <button style={menuItem} onClick={async () => {
-                                          setMoreOpen(false);
-                                          try {
-                                            const newStatus = !activeStatus;
-                                            await apiRequest(`/customers/${c.id}`, { method: "PUT", body: JSON.stringify({ is_active: newStatus }) });
-                                            toast.success(newStatus ? "Customer activated" : "Customer deactivated");
-                                            setActiveStatus(newStatus);
-                                            const res = await apiRequest(`/customers/${c.id}`);
-                                            if (res) setExpandedCustomer(res.customer);
-                                            fetchCustomers();
-                                            fetchActivities(c.id);
-                                          } catch (err) { toast.error("Failed to update status"); }
-                                        }}>{activeStatus ? "Mark as Inactive" : "Mark as Active"}</button>
-                                        <button style={menuItem} onClick={() => { setMoreOpen(false); toast("Invoice page coming soon"); }}>New Invoice</button>
-                                        <button style={menuItem} onClick={() => { setMoreOpen(false); toast("Payment feature coming soon"); }}>New Payment</button>
-                                        <button style={menuItem} onClick={() => { setMoreOpen(false); toast("Credit note feature coming soon"); }}>New Credit Note</button>
-                                        <button style={menuItem} onClick={() => { setMoreOpen(false); setActiveTab("Transactions"); }}>View All Transactions</button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Tabs */}
-                              <div style={{ display: "flex", borderBottom: "2px solid #e2e8f0", marginBottom: "30px" }}>
-                                {["Overview", "Comments", "Transactions", "Mails", "Statement"].map((tab) => (
-                                  <button key={tab} onClick={() => setActiveTab(tab)} style={tabStyle(tab)}>{tab}</button>
-                                ))}
-                              </div>
-
-                              {/* ===== OVERVIEW ===== */}
-                              {activeTab === "Overview" && (
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "30px" }}>
-                                  <div>
-                                    <h4>Billing Address</h4>
-                                    <div style={cardStyle}>
-                                      {billing ? (
-                                        <>
-                                          <p><strong>{billing.attention}</strong></p>
-                                          <p>{billing.address_line1}</p>
-                                          <p>{billing.address_line2}</p>
-                                          <p>{billing.city}, {billing.state} {billing.pin_code}</p>
-                                          <p>{billing.country}</p>
-                                          <p>Phone: {billing.phone}</p>
-                                          {billing.fax && <p>Fax: {billing.fax}</p>}
-                                          <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={{ background: "none", border: "none", color: "#4a90e2", cursor: "pointer", padding: 0, marginTop: "10px" }}>Edit Address</button>
-                                        </>
-                                      ) : (
-                                        <div>
-                                          <p style={{ color: "gray" }}>No billing address</p>
-                                          <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={{ background: "none", border: "none", color: "#4a90e2", cursor: "pointer", padding: 0 }}>+ New Address</button>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <h4 style={{ marginTop: "20px" }}>Shipping Address</h4>
-                                    <div style={cardStyle}>
-                                      {shipping ? (
-                                        <>
-                                          <p><strong>{shipping.attention}</strong></p>
-                                          <p>{shipping.address_line1}</p>
-                                          <p>{shipping.address_line2}</p>
-                                          <p>{shipping.city}, {shipping.state} {shipping.pin_code}</p>
-                                          <p>{shipping.country}</p>
-                                          <p>Phone: {shipping.phone}</p>
-                                          {shipping.fax && <p>Fax: {shipping.fax}</p>}
-                                        </>
-                                      ) : (
-                                        <div>
-                                          <p style={{ color: "gray" }}>No shipping address</p>
-                                          {billing && <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={{ background: "none", border: "none", color: "#4a90e2", cursor: "pointer", padding: 0 }}>Copy from Billing</button>}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <h4 style={{ marginTop: "20px" }}>Contact Persons</h4>
-                                    <div style={cardStyle}>
-                                      {expandedContacts.length === 0 ? (
-                                        <div>
-                                          <p style={{ color: "gray" }}>No contact persons.</p>
-                                          <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={{ background: "none", border: "none", color: "#4a90e2", cursor: "pointer", padding: 0 }}>+ Add Contact Person</button>
-                                        </div>
-                                      ) : (
-                                        expandedContacts.map((p, idx) => (
-                                          <div key={idx} style={{ marginBottom: "10px" }}>
-                                            <p><strong>{[p.salutation, p.first_name, p.last_name].filter(Boolean).join(" ")}</strong></p>
-                                            <p>Email: {p.email}</p>
-                                            <p>Work Phone: {p.work_phone}</p>
-                                            <p>Mobile: {p.mobile}</p>
-                                          </div>
-                                        ))
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <h4>Other Details</h4>
-                                    <div style={cardStyle}>
-                                      <p><strong>Customer Type:</strong> {expandedCustomer.customer_type}</p>
-                                      <p><strong>Sub‑Type:</strong> {expandedCustomer.customer_sub_type || "—"}</p>
-                                      <p><strong>Default Currency:</strong> {expandedCustomer.currency}</p>
-                                      <p><strong>Postal Status:</strong> {expandedCustomer.enable_portal ? "Enabled" : "Disabled"}</p>
-                                      <p><strong>Customer Language:</strong> {expandedCustomer.portal_language || expandedCustomer.language || "English"}</p>
-                                      <p><strong>Payment Due Period:</strong> {expandedCustomer.payment_terms || "Due on Receipt"}</p>
-                                    </div>
-
-                                    <h4 style={{ marginTop: "20px" }}>Record Info</h4>
-                                    <div style={cardStyle}>
-                                      <div style={{ position: "relative", paddingLeft: "30px" }}>
-                                        <div style={{ position: "absolute", left: 8, top: 8, bottom: 8, width: 2, background: "#e2e8f0" }} />
-                                        {/* ✅ FIX: activities guaranteed [] so .length safe hai */}
-                                        {activities.length === 0 ? (
-                                          <p style={{ color: "gray" }}>No activity yet.</p>
-                                        ) : (
-                                          activities.map((act) => (
-                                            <div key={act.id} style={{ marginBottom: "18px", position: "relative" }}>
-                                              <div style={{
-                                                position: "absolute", left: -26, top: 4, width: 12, height: 12, borderRadius: "50%",
-                                                background: act.action_type === "created" ? "#4a90e2" : act.action_type === "status_changed" ? "#f39c12" : act.action_type === "comment_added" ? "#2ecc71" : "#95a5a6",
-                                              }} />
-                                              <p style={{ fontWeight: "bold", margin: 0 }}>{act.description}</p>
-                                              <p style={{ margin: "2px 0", color: "gray", fontSize: "12px" }}>
-                                                {new Date(act.created_at).toLocaleString()} ({timeAgo(act.created_at)}) · by {act.user_email}
-                                              </p>
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <h4 style={{ marginTop: "20px" }}>Receivables</h4>
-                                    <div style={cardStyle}>
-                                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                        <thead>
-                                          <tr style={{ borderBottom: "1px solid #e2e8f0" }}>
-                                            <th style={{ padding: "8px 0", textAlign: "left", color: "gray", fontWeight: "normal" }}>Currency</th>
-                                            <th style={{ padding: "8px 0", textAlign: "left", color: "gray", fontWeight: "normal" }}>Outstanding Receivables</th>
-                                            <th style={{ padding: "8px 0", textAlign: "left", color: "gray", fontWeight: "normal" }}>Unused Credits</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          <tr>
-                                            <td style={{ padding: "8px 0" }}>{expandedCustomer.currency}</td>
-                                            <td style={{ padding: "8px 0", fontWeight: "500" }}>₹{balanceDue.toFixed(2)}</td>
-                                            <td style={{ padding: "8px 0", fontWeight: "500" }}>₹0.00</td>
-                                          </tr>
-                                        </tbody>
-                                      </table>
-                                      {openingBalance === 0 && totalInvoiced === 0 && (
-                                        <button onClick={() => navigate(`/customers/${c.id}/edit`)} style={{ ...primaryBtn, marginTop: "15px", fontSize: "13px" }}>Enter Opening Balance</button>
-                                      )}
-                                    </div>
-
-                                    <h4 style={{ marginTop: "20px" }}>
-                                      Total Income
-                                      <select value={incomePeriod} onChange={(e) => setIncomePeriod(e.target.value)} style={{ marginLeft: "10px", padding: "4px", borderRadius: "5px", border: "1px solid #ccc", fontSize: "13px" }}>
-                                        <option value="today">Today</option>
-                                        <option value="thisWeek">This Week</option>
-                                        <option value="thisMonth">This Month</option>
-                                        <option value="last6Months">Last 6 Months</option>
-                                        <option value="last12Months">Last 12 Months</option>
-                                      </select>
-                                    </h4>
-                                    <div style={cardStyle}>
-                                      {incomeChartData.length === 0 ? (
-                                        <p style={{ textAlign: "center", color: "gray" }}>No invoice data for this period.</p>
-                                      ) : (
-                                        <div style={{ display: "flex", justifyContent: "space-around", alignItems: "flex-end", height: "180px", padding: "10px 0" }}>
-                                          {incomeChartData.map((item) => (
-                                            <div key={item.key} style={{ textAlign: "center", flex: 1 }}>
-                                              <div style={{ height: `${(item.amount / chartMax) * 150}px`, width: "20px", background: "#4a90e2", borderRadius: "4px 4px 0 0", margin: "0 auto", transition: "height 0.3s" }}></div>
-                                              <p style={{ fontSize: "10px", marginTop: "4px" }}>{item.month}</p>
-                                              <p style={{ fontSize: "10px", color: "gray" }}>₹{item.amount.toFixed(0)}</p>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* ===== COMMENTS ===== */}
-                              {activeTab === "Comments" && (
-                                <div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                                    <h3 style={{ margin: 0 }}>Comments</h3>
-                                    <button onClick={addComment} style={primaryBtn} disabled={!newComment.trim()}>Add Comment</button>
-                                  </div>
-                                  <div style={{ marginBottom: "20px" }}>
-                                    <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." style={{ width: "100%", padding: "10px", borderRadius: "5px", border: "1px solid #ccc", minHeight: "80px" }} />
-                                  </div>
-                                  {commentsLoading ? (<p>Loading comments...</p>
-                                  ) : comments.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "40px", color: "gray" }}>No comments yet.</div>
-                                  ) : (
-                                    <div>
-                                      {comments.map((comment) => (
-                                        <div key={comment.id} style={{ ...cardStyle, marginBottom: "10px" }}>
-                                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                                            <strong>{comment.author_name}</strong>
-                                            <span style={{ color: "gray", fontSize: "12px" }}>{new Date(comment.created_at).toLocaleString()}</span>
-                                          </div>
-                                          <p style={{ margin: 0 }}>{comment.comment_text}</p>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* ===== TRANSACTIONS ===== */}
-                              {activeTab === "Transactions" && (
-                                <div>
-                                  <div style={{ display: "flex", gap: "30px", marginBottom: "30px", flexWrap: "wrap" }}>
-                                    <StatBox label="Opening Balance" value={`₹${openingBalance.toFixed(2)}`} />
-                                    <StatBox label="Invoiced Amount" value={`₹${totalInvoiced.toFixed(2)}`} />
-                                    <StatBox label="Amount Received" value={`₹${amountReceived.toFixed(2)}`} />
-                                    <StatBox label="Balance Due" value={`₹${balanceDue.toFixed(2)}`} highlight />
-                                  </div>
-                                  {[
-                                    {
-                                      title: "Invoices", content: invoicesLoading ? <p>Loading invoices...</p> : invoices.length === 0 ? (<div style={{ textAlign: "center", padding: "30px", color: "gray" }}><p>No invoices found.</p><button onClick={() => handleNewTransaction(expandedId)} style={{ ...primaryBtn, marginTop: "10px" }}>Add New</button></div>) : (
-                                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-                                          <thead><tr style={{ background: "#f1f5f9", textAlign: "left" }}><th style={thStyle}>Date</th><th style={thStyle}>Invoice #</th><th style={thStyle}>Amount</th><th style={thStyle}>Balance Due</th><th style={thStyle}>Status</th><th style={thStyle}>Actions</th></tr></thead>
-                                          <tbody>{invoices.map((inv) => (<tr key={inv.id} style={{ borderBottom: "1px solid #e2e8f0" }}><td style={tdStyle}>{new Date(inv.invoice_date).toLocaleDateString()}</td><td style={tdStyle}>{inv.invoice_number || "—"}</td><td style={tdStyle}>₹{parseFloat(inv.total_amount).toFixed(2)}</td><td style={tdStyle}>₹{parseFloat(inv.balance_due).toFixed(2)}</td><td style={tdStyle}>{inv.status}</td><td style={tdStyle}><button onClick={() => navigate(`/invoices/${inv.id}`)} style={editBtnStyle}>View</button></td></tr>))}</tbody>
-                                        </table>
-                                      ), btn: "+ New Invoice", action: () => handleNewTransaction(expandedId)
-                                    },
-                                    { title: "Expenses", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No expenses recorded yet.</div>, btn: "+ New Expense", action: () => toast("Expenses feature coming soon") },
-                                    { title: "Projects", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No projects yet.</div>, btn: "+ New Project", action: () => toast("Projects feature coming soon") },
-                                    { title: "Journals", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No journal entries found.</div>, btn: "+ New Journal", action: () => toast("Journals feature coming soon") },
-                                    { title: "Bills", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No bills recorded yet.</div>, btn: "+ New Bill", action: () => toast("Bills feature coming soon") },
-                                    { title: "Credit Notes", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No credit notes yet.</div>, btn: "+ New Credit Note", action: () => toast("Credit notes feature coming soon") },
-                                    { title: "Customer Payments", content: <div style={{ textAlign: "center", padding: "30px", color: "gray" }}>No payments received or recorded yet.</div>, btn: "+ New Payment", action: () => toast("Payment feature coming soon") },
-                                  ].map(({ title, content, btn, action }) => (
-                                    <div key={title} style={{ marginBottom: "40px" }}>
-                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-                                        <h3 style={{ margin: 0 }}>{title}</h3>
-                                        <button onClick={action} style={primaryBtn}>{btn}</button>
-                                      </div>
-                                      {content}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* ===== MAILS ===== */}
-                              {activeTab === "Mails" && (
-                                <div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                                    <h3 style={{ margin: 0 }}>System Mails</h3>
-                                    <button onClick={() => toast("Link email account feature coming soon")} style={primaryBtn}>Link Email Account</button>
-                                  </div>
-                                  <div style={{ textAlign: "center", padding: "60px", color: "gray" }}>
-                                    <p style={{ fontSize: "16px" }}>No emails sent.</p>
-                                    <p style={{ fontSize: "14px", marginTop: "10px" }}>System emails (e.g., statements, invoice reminders) will appear here once the email account is linked.</p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* ===== STATEMENT ===== */}
-                              {activeTab === "Statement" && (
-                                <div>
-                                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                                    <h3 style={{ margin: 0 }}>Customer Statement</h3>
-                                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                                      <select value={statementPreset} onChange={(e) => { setStatementPreset(e.target.value); if (e.target.value !== "custom") setGeneratedStatement(null); }} style={dropdownStyle}>
-                                        <option value="today">Today</option>
-                                        <option value="thisWeek">This Week</option>
-                                        <option value="thisMonth">This Month</option>
-                                        <option value="thisYear">This Year</option>
-                                        <option value="lifetime">Lifetime</option>
-                                        <option value="custom">Custom</option>
-                                      </select>
-                                      {statementPreset === "custom" && (
-                                        <>
-                                          <input type="date" value={statementRange.from} onChange={(e) => setStatementRange({ ...statementRange, from: e.target.value })} style={inputStyle} />
-                                          <span>to</span>
-                                          <input type="date" value={statementRange.to} onChange={(e) => setStatementRange({ ...statementRange, to: e.target.value })} style={inputStyle} />
-                                        </>
-                                      )}
-                                      <select value={statementFilter} onChange={(e) => setStatementFilter(e.target.value)} style={dropdownStyle}>
-                                        <option value="all">All</option>
-                                        <option value="outstanding">Outstanding</option>
-                                      </select>
-                                      <button onClick={handleGenerateStatement} disabled={statementLoading} style={primaryBtn}>{statementLoading ? "Generating..." : "Generate"}</button>
-                                    </div>
-                                  </div>
-                                  {generatedStatement && (
-                                    <div style={{ border: "1px solid #ddd", borderRadius: "8px", padding: "20px", background: "#fff" }}>
-                                      <div style={{ marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "15px" }}>
-                                        <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
-                                          <div style={{ flex: "1 1 200px" }}>
-                                            <label style={labelStyle}>Organization Name</label>
-                                            <input type="text" value={orgInfo.name} onChange={(e) => setOrgInfo({ ...orgInfo, name: e.target.value })} style={inputStyleLarge} />
-                                          </div>
-                                          <div style={{ flex: "1 1 200px" }}>
-                                            <label style={labelStyle}>Organization Address</label>
-                                            <textarea value={orgInfo.address} onChange={(e) => setOrgInfo({ ...orgInfo, address: e.target.value })} rows={2} style={inputStyleLarge} />
-                                          </div>
-                                          <div style={{ flex: "1 1 150px" }}>
-                                            <label style={labelStyle}>Country</label>
-                                            <input type="text" value={orgInfo.country} onChange={(e) => setOrgInfo({ ...orgInfo, country: e.target.value })} style={inputStyleLarge} />
-                                          </div>
-                                          <div style={{ flex: "1 1 200px" }}>
-                                            <label style={labelStyle}>Email</label>
-                                            <input type="email" value={orgInfo.email} onChange={(e) => setOrgInfo({ ...orgInfo, email: e.target.value })} style={inputStyleLarge} />
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div style={{ textAlign: "right", marginBottom: "20px" }}>
-                                        <h2 style={{ margin: 0 }}>{orgInfo.name}</h2>
-                                        <p style={{ margin: "2px 0" }}>{orgInfo.address}</p>
-                                        <p style={{ margin: "2px 0" }}>{orgInfo.country}</p>
-                                        <p style={{ margin: "2px 0" }}>{orgInfo.email}</p>
-                                      </div>
-                                      <h3 style={{ marginBottom: "5px" }}>Statement of Accounts</h3>
-                                      <p style={{ margin: 0 }}>To: <strong>{getCustomerName(expandedCustomer)}</strong></p>
-                                      <p style={{ margin: "5px 0" }}>Statement Period: <strong>{generatedStatement.from}</strong> to <strong>{generatedStatement.to}</strong></p>
-                                      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "20px" }}>
-                                        <thead><tr style={{ background: "#f1f5f9" }}><th style={thStyle}>Account Summary</th><th style={thStyle}>Amount</th></tr></thead>
-                                        <tbody>
-                                          <tr><td style={tdStyle}>Opening Balance</td><td style={tdStyle}>₹{generatedStatement.openingBalance}</td></tr>
-                                          <tr><td style={tdStyle}>Invoiced Amount</td><td style={tdStyle}>₹{generatedStatement.totalInvoiced}</td></tr>
-                                          <tr><td style={tdStyle}>Amount Received</td><td style={tdStyle}>₹{generatedStatement.amountReceived}</td></tr>
-                                          <tr style={{ fontWeight: "bold" }}><td style={tdStyle}>Balance Due</td><td style={tdStyle}>₹{generatedStatement.balanceDue}</td></tr>
-                                        </tbody>
-                                      </table>
-                                      <h4 style={{ marginBottom: "10px" }}>Transactions</h4>
-                                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-                                        <thead><tr style={{ background: "#f1f5f9", textAlign: "left" }}><th style={thStyle}>Date</th><th style={thStyle}>Transactions</th><th style={thStyle}>Details</th><th style={thStyle}>Amount</th><th style={thStyle}>Payments</th><th style={thStyle}>Balance</th></tr></thead>
-                                        <tbody>
-                                          {generatedStatement.rows.length > 0 ? (
-                                            generatedStatement.rows.map((row, i) => (
-                                              <tr key={i} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                                                <td style={tdStyle}>{row.date}</td><td style={tdStyle}>{row.transaction}</td><td style={tdStyle}>{row.details}</td>
-                                                <td style={tdStyle}>₹{row.amount}</td><td style={tdStyle}>₹{row.payments}</td><td style={tdStyle}>₹{row.balance}</td>
-                                              </tr>
-                                            ))
-                                          ) : (
-                                            <tr><td colSpan={6} style={{ textAlign: "center", padding: "20px" }}>No transactions in this period.</td></tr>
-                                          )}
-                                        </tbody>
-                                      </table>
-                                      <div style={{ display: 'flex', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
-                                        <button onClick={handlePrint} style={secondaryBtn}>🖨 Print</button>
-                                        <button onClick={handleDownloadPDF} disabled={pdfLoading} style={{ ...secondaryBtn, opacity: pdfLoading ? 0.6 : 1 }}>{pdfLoading ? 'Generating PDF...' : '⬇ Download PDF'}</button>
-                                        <button onClick={handleDownloadXLS} style={secondaryBtn}>XLS</button>
-                                        <button onClick={openEmailModal} style={secondaryBtn}>✉ Send Email</button>
-                                      </div>
-                                    </div>
-                                  )}
+                              ) : (
+                                <div style={{ fontSize: "13px", color: "#667085" }}>
+                                  No Billing Address configured.
+                                  <button onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", padding: 0, marginTop: "6px", display: "block", fontSize: "12px", fontWeight: "500" }}>+ Add Address</button>
                                 </div>
                               )}
                             </div>
-                          ) : (
-                            <div style={{ padding: "20px", background: "#f9fafb" }}>Failed to load details.</div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
 
-        {/* ── Email Modal ── */}
-        {emailModalOpen && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div style={{ background: '#fff', borderRadius: '12px', padding: '28px 32px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>✉ Send Statement by Email</h3>
-                <button onClick={() => setEmailModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+                            {/* Shipping */}
+                            <div style={{ border: "1px solid #eaecf0", borderRadius: "8px", padding: "16px", background: "#ffffff" }}>
+                              <div style={{ fontSize: "12px", fontWeight: "600", color: "#667085", marginBottom: "8px" }}>SHIPPING ADDRESS</div>
+                              {shipping ? (
+                                <div style={{ fontSize: "13px", color: "#344054", lineHeight: "1.5" }}>
+                                  <div style={{ fontWeight: "600" }}>{shipping.attention}</div>
+                                  <div>{shipping.address_line1}</div>
+                                  {shipping.address_line2 && <div>{shipping.address_line2}</div>}
+                                  <div>{shipping.city}, {shipping.state} {shipping.pin_code}</div>
+                                  <div>{shipping.country}</div>
+                                  {shipping.phone && <div style={{ marginTop: "4px", color: "#667085" }}>Phone: {shipping.phone}</div>}
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: "13px", color: "#667085" }}>
+                                  No Shipping Address configured.
+                                  {billing && <button onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", padding: 0, marginTop: "6px", display: "block", fontSize: "12px", fontWeight: "500" }}>Copy from Billing</button>}
+                                </div>
+                              )}
+                            </div>
+
+                          </div>
+                        </div>
+
+                        {/* Contact Persons list */}
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                            <h4 style={{ margin: 0, fontSize: "13px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Contact Persons</h4>
+                            <button onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>+ Add</button>
+                          </div>
+                          
+                          <div style={{ border: "1px solid #eaecf0", borderRadius: "8px", overflow: "hidden" }}>
+                            {expandedContacts.length === 0 ? (
+                              <div style={{ padding: "16px", textAlign: "center", color: "#667085", fontSize: "13px" }}>No contact persons found.</div>
+                            ) : (
+                              expandedContacts.map((p, idx) => (
+                                <div key={idx} style={{ padding: "12px 16px", borderBottom: idx === expandedContacts.length - 1 ? "none" : "1px solid #eaecf0", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#ffffff" }}>
+                                  <div>
+                                    <div style={{ fontSize: "13px", fontWeight: "600", color: "#1d2939" }}>{[p.salutation, p.first_name, p.last_name].filter(Boolean).join(" ")}</div>
+                                    <div style={{ fontSize: "11px", color: "#667085", marginTop: "2px" }}>{p.email}</div>
+                                  </div>
+                                  <div style={{ fontSize: "12px", color: "#475569", textAlign: "right" }}>
+                                    <div>{p.work_phone || p.mobile || "—"}</div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Other details */}
+                        <div>
+                          <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Other Details</h4>
+                          <div style={{ border: "1px solid #eaecf0", borderRadius: "8px", background: "#fcfcfd", padding: "16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600" }}>CUSTOMER TYPE</div>
+                              <div style={{ fontSize: "13px", fontWeight: "500", color: "#1d2939", marginTop: "4px" }}>{expandedCustomer.customer_type || "Business"}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600" }}>DEFAULT CURRENCY</div>
+                              <div style={{ fontSize: "13px", fontWeight: "500", color: "#1d2939", marginTop: "4px" }}>{expandedCustomer.currency || "INR"}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600" }}>PAN</div>
+                              <div style={{ fontSize: "13px", fontWeight: "500", color: "#1d2939", marginTop: "4px" }}>{expandedCustomer.pan || "LNOPKRF16"}</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600" }}>PORTAL STATUS</div>
+                              <div style={{ fontSize: "13px", fontWeight: "500", color: expandedCustomer.enable_portal ? "#12b76a" : "#f04438", marginTop: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: expandedCustomer.enable_portal ? "#10b981" : "#f04438" }}></span>
+                                {expandedCustomer.enable_portal ? "Enabled" : "Disabled"}
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600" }}>CUSTOMER LANGUAGE</div>
+                              <div style={{ fontSize: "13px", fontWeight: "500", color: "#1d2939", marginTop: "4px" }}>{expandedCustomer.portal_language || expandedCustomer.language || "English"}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      {/* Right Column Details */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+                        
+                        {/* Payment Term */}
+                        <div style={{ background: "#f8fafc", border: "1px solid #eaecf0", borderRadius: "8px", padding: "14px 18px", fontSize: "12px", color: "#475569" }}>
+                          <span style={{ fontWeight: "600", color: "#1d2939" }}>Payment due period:</span> {expandedCustomer.payment_terms || "Due end of the month"}
+                        </div>
+
+                        {/* Receivables Card */}
+                        <div className="receivable-card">
+                          <h4 style={{ margin: "0 0 16px 0", fontSize: "12px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Receivables</h4>
+                          
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr", borderBottom: "1px solid #eaecf0", paddingBottom: "12px", marginBottom: "12px", fontSize: "11px", fontWeight: "600", color: "#667085" }}>
+                            <div>CURRENCY</div>
+                            <div style={{ textAlign: "right" }}>OUTSTANDING RECEIVABLES</div>
+                            <div style={{ textAlign: "right" }}>UNUSED CREDITS</div>
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr", fontSize: "13px", color: "#1d2939", fontWeight: "500" }}>
+                            <div>{expandedCustomer.currency || "INR"}</div>
+                            <div style={{ textAlign: "right", color: "#006ee6", fontWeight: "600" }}>₹{balanceDue.toFixed(2)}</div>
+                            <div style={{ textAlign: "right", color: "#667085" }}>₹0.00</div>
+                          </div>
+
+                          {balanceDue === 0 && (
+                            <button 
+                              onClick={() => navigate(`/customers/${expandedCustomer.id}/edit`)} 
+                              style={{ background: "none", border: "none", color: "#006ee6", cursor: "pointer", fontSize: "12px", fontWeight: "600", padding: 0, marginTop: "16px", textDecoration: "underline" }}
+                            >
+                              View Opening Balance
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Income Graph */}
+                        <div style={{ border: "1px solid #eaecf0", borderRadius: "10px", padding: "20px", background: "#ffffff" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <h4 style={{ margin: 0, fontSize: "12px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Income</h4>
+                            <select 
+                              value={incomePeriod} 
+                              onChange={(e) => setIncomePeriod(e.target.value)} 
+                              style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "11px", background: "#ffffff", outline: "none", cursor: "pointer" }}
+                            >
+                              <option value="last6Months">Last 6 Months</option>
+                              <option value="last12Months">Last 12 Months</option>
+                              <option value="thisMonth">This Month</option>
+                              <option value="thisWeek">This Week</option>
+                            </select>
+                          </div>
+
+                          {incomeChartData.length === 0 ? (
+                            <div style={{ padding: "40px 10px", textAlign: "center", color: "#667085", fontSize: "13px" }}>No income recorded yet.</div>
+                          ) : (
+                            <div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", height: "130px", paddingBottom: "10px", borderBottom: "1px solid #f2f4f7" }}>
+                                {incomeChartData.map((item) => (
+                                  <div key={item.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }} title={`₹${item.amount.toFixed(2)}`}>
+                                    <div 
+                                      style={{ 
+                                        height: `${(item.amount / chartMax) * 100}px`, 
+                                        width: "14px", 
+                                        background: "#12b76a", 
+                                        borderRadius: "3px 3px 0 0", 
+                                        transition: "height 0.3s ease",
+                                        minHeight: item.amount > 0 ? "4px" : "0" 
+                                      }}
+                                    ></div>
+                                    <div style={{ fontSize: "9px", color: "#475569", marginTop: "6px", transform: "scale(0.95)" }}>{item.month}</div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: "11px", color: "#475569", fontWeight: "500", marginTop: "12px", textAlign: "center" }}>
+                                Total Income ({incomePeriod === "last6Months" ? "Last 6 Months" : "Period"}) - <span style={{ fontWeight: "700", color: "#1d2939" }}>₹{incomeChartData.reduce((s,i)=>s+i.amount,0).toLocaleString("en-IN", {maximumFractionDigits: 2})}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Activity Log / Timeline */}
+                        <div style={{ border: "1px solid #eaecf0", borderRadius: "10px", padding: "20px", background: "#ffffff" }}>
+                          <h4 style={{ margin: "0 0 16px 0", fontSize: "12px", color: "#475569", textTransform: "uppercase", letterSpacing: "0.03em", fontWeight: "600" }}>Timeline</h4>
+                          
+                          <div style={{ position: "relative", paddingLeft: "24px" }}>
+                            <div className="timeline-line"></div>
+                            
+                            {activities.length === 0 ? (
+                              <div style={{ fontSize: "13px", color: "#667085" }}>No recent activity.</div>
+                            ) : (
+                              activities.slice(0, 5).map((act) => {
+                                const typeClass = act.action_type === "created" ? " timeline-node success" : act.action_type === "comment_added" ? " timeline-node primary" : " timeline-node warning";
+                                
+                                return (
+                                  <div key={act.id} style={{ marginBottom: "20px", position: "relative" }}>
+                                    <div className={typeClass}></div>
+                                    <div style={{ fontSize: "13px", fontWeight: "600", color: "#344054" }}>{act.description}</div>
+                                    <div style={{ fontSize: "11px", color: "#667085", marginTop: "3px" }}>
+                                      {new Date(act.created_at).toLocaleDateString()} {new Date(act.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} · {act.user_email || "System"}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* ===== TAB: COMMENTS ===== */}
+                  {activeTab === "Comments" && (
+                    <div style={{ maxWidth: "700px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#344054" }}>Comments</h3>
+                        <button onClick={addComment} style={{ padding: "8px 16px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }} disabled={!newComment.trim()}>Add Comment</button>
+                      </div>
+                      <div style={{ marginBottom: "20px" }}>
+                        <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Write a comment..." style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d0d5dd", minHeight: "80px", outline: "none", fontSize: "13px", fontFamily: "inherit" }} className="premium-input" />
+                      </div>
+                      {commentsLoading ? (
+                        <p>Loading comments...</p>
+                      ) : comments.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px", color: "#667085", fontSize: "13px" }}>No comments yet.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                          {comments.map((comment) => (
+                            <div key={comment.id} style={{ border: "1px solid #eaecf0", borderRadius: "8px", padding: "16px", background: "#fcfcfd" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                                <strong style={{ fontSize: "13px", color: "#344054" }}>{comment.author_name}</strong>
+                                <span style={{ color: "#667085", fontSize: "11px" }}>{new Date(comment.created_at).toLocaleString()}</span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: "13px", color: "#475569", lineHeight: "1.5" }}>{comment.comment_text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== TAB: TRANSACTIONS ===== */}
+                  {activeTab === "Transactions" && (
+                    <div>
+                      <div style={{ display: "flex", gap: "16px", marginBottom: "32px", flexWrap: "wrap" }}>
+                        <StatBox label="Opening Balance" value={`₹${openingBalance.toFixed(2)}`} />
+                        <StatBox label="Invoiced Amount" value={`₹${totalInvoiced.toFixed(2)}`} />
+                        <StatBox label="Amount Received" value={`₹${amountReceived.toFixed(2)}`} />
+                        <StatBox label="Balance Due" value={`₹${balanceDue.toFixed(2)}`} highlight />
+                      </div>
+
+                      {[
+                        {
+                          title: "Invoices", 
+                          content: invoicesLoading ? (
+                            <p>Loading invoices...</p>
+                          ) : invoices.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "30px", color: "#667085" }}>
+                              <p style={{ fontSize: "13px" }}>No invoices found.</p>
+                              <button onClick={() => handleNewTransaction(expandedCustomer.id)} style={{ padding: "8px 14px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer", marginTop: "10px" }}>Add New</button>
+                            </div>
+                          ) : (
+                            <div style={{ border: "1px solid #eaecf0", borderRadius: "8px", overflow: "hidden" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                                <thead>
+                                  <tr style={{ background: "#f9fafb", textAlign: "left", borderBottom: "1px solid #eaecf0" }}>
+                                    <th style={thStyle}>Date</th>
+                                    <th style={thStyle}>Invoice #</th>
+                                    <th style={thStyle}>Amount</th>
+                                    <th style={thStyle}>Balance Due</th>
+                                    <th style={thStyle}>Status</th>
+                                    <th style={thStyle}>Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {invoices.map((inv) => (
+                                    <tr key={inv.id} style={{ borderBottom: "1px solid #eaecf0" }}>
+                                      <td style={tdStyle}>{new Date(inv.invoice_date).toLocaleDateString()}</td>
+                                      <td style={tdStyle}>{inv.invoice_number || "—"}</td>
+                                      <td style={tdStyle}>₹{parseFloat(inv.total_amount).toFixed(2)}</td>
+                                      <td style={tdStyle}>₹{parseFloat(inv.balance_due).toFixed(2)}</td>
+                                      <td style={tdStyle}>{inv.status}</td>
+                                      <td style={tdStyle}>
+                                        <button onClick={() => navigate(`/invoices/${inv.id}`)} style={{ padding: "4px 8px", background: "none", border: "1px solid #006ee6", color: "#006ee6", borderRadius: "4px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>View</button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ), 
+                          btn: "+ New Invoice", 
+                          action: () => handleNewTransaction(expandedCustomer.id)
+                        },
+                        { title: "Expenses", content: <div style={{ textAlign: "center", padding: "30px", color: "#667085", fontSize: "13px" }}>No expenses recorded yet.</div>, btn: "+ New Expense", action: () => toast("Expenses feature coming soon") },
+                        { title: "Projects", content: <div style={{ textAlign: "center", padding: "30px", color: "#667085", fontSize: "13px" }}>No projects yet.</div>, btn: "+ New Project", action: () => toast("Projects feature coming soon") },
+                      ].map(({ title, content, btn, action }) => (
+                        <div key={title} style={{ marginBottom: "40px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                            <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#344054", textTransform: "uppercase", letterSpacing: "0.03em" }}>{title}</h3>
+                            <button onClick={action} style={{ padding: "6px 12px", background: "#ffffff", border: "1px solid #d0d5dd", color: "#344054", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>{btn}</button>
+                          </div>
+                          {content}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ===== TAB: MAILS ===== */}
+                  {activeTab === "Mails" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#344054" }}>System Mails</h3>
+                        <button onClick={() => toast("Link email account feature coming soon")} style={{ padding: "8px 14px", background: "#ffffff", border: "1px solid #d0d5dd", color: "#344054", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Link Email Account</button>
+                      </div>
+                      <div style={{ textAlign: "center", padding: "60px", color: "#667085", background: "#fcfcfd", border: "1px dashed #eaecf0", borderRadius: "8px" }}>
+                        <p style={{ fontSize: "14px", fontWeight: "600", color: "#344054", margin: 0 }}>No emails sent.</p>
+                        <p style={{ fontSize: "12px", marginTop: "6px" }}>System emails (e.g., statements, invoice reminders) will appear here once the email account is linked.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== TAB: STATEMENT ===== */}
+                  {activeTab === "Statement" && (
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+                        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#344054" }}>Statement</h3>
+                        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                          <select value={statementPreset} onChange={(e) => { setStatementPreset(e.target.value); if (e.target.value !== "custom") setGeneratedStatement(null); }} style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", outline: "none", background: "#ffffff", cursor: "pointer" }}>
+                            <option value="today">Today</option>
+                            <option value="thisWeek">This Week</option>
+                            <option value="thisMonth">This Month</option>
+                            <option value="thisYear">This Year</option>
+                            <option value="lifetime">Lifetime</option>
+                            <option value="custom">Custom Range</option>
+                          </select>
+                          
+                          {statementPreset === "custom" && (
+                            <>
+                              <input type="date" value={statementRange.from} onChange={(e) => setStatementRange({ ...statementRange, from: e.target.value })} style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px" }} />
+                              <span style={{ fontSize: "13px", color: "#667085" }}>to</span>
+                              <input type="date" value={statementRange.to} onChange={(e) => setStatementRange({ ...statementRange, to: e.target.value })} style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px" }} />
+                            </>
+                          )}
+                          
+                          <select value={statementFilter} onChange={(e) => setStatementFilter(e.target.value)} style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", outline: "none", background: "#ffffff", cursor: "pointer" }}>
+                            <option value="all">All transactions</option>
+                            <option value="outstanding">Outstanding only</option>
+                          </select>
+                          
+                          <button onClick={handleGenerateStatement} disabled={statementLoading} style={{ padding: "8px 16px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>{statementLoading ? "Generating..." : "Generate"}</button>
+                        </div>
+                      </div>
+
+                      {generatedStatement && (
+                        <div style={{ border: "1px solid #eaecf0", borderRadius: "10px", padding: "24px", background: "#ffffff", boxShadow: "0 4px 15px rgba(16,24,40,0.02)" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #eaecf0", paddingBottom: "20px", marginBottom: "20px" }}>
+                            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", flex: 1 }}>
+                              <div style={{ minWidth: "180px" }}>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "#667085", marginBottom: "4px" }}>COMPANY NAME</label>
+                                <input type="text" value={orgInfo.name} onChange={(e) => setOrgInfo({ ...orgInfo, name: e.target.value })} style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", width: "100%", boxSizing: "border-box" }} />
+                              </div>
+                              <div style={{ minWidth: "220px" }}>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "#667085", marginBottom: "4px" }}>ADDRESS</label>
+                                <textarea value={orgInfo.address} onChange={(e) => setOrgInfo({ ...orgInfo, address: e.target.value })} rows={2} style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", width: "100%", boxSizing: "border-box", resize: "none" }} />
+                              </div>
+                              <div style={{ minWidth: "150px" }}>
+                                <label style={{ display: "block", fontSize: "11px", fontWeight: "600", color: "#667085", marginBottom: "4px" }}>EMAIL</label>
+                                <input type="email" value={orgInfo.email} onChange={(e) => setOrgInfo({ ...orgInfo, email: e.target.value })} style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "13px", width: "100%", boxSizing: "border-box" }} />
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: "right" }}>
+                              <h3 style={{ margin: "0 0 4px 0", fontSize: "16px", color: "#1d2939" }}>{orgInfo.name}</h3>
+                              <p style={{ margin: 0, fontSize: "12px", color: "#667085", lineHeight: "1.5" }}>{orgInfo.address}</p>
+                              <p style={{ margin: 0, fontSize: "12px", color: "#667085" }}>{orgInfo.email}</p>
+                            </div>
+                          </div>
+
+                          <div style={{ marginBottom: "24px" }}>
+                            <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", color: "#1d2939" }}>Statement of Accounts</h3>
+                            <div style={{ fontSize: "13px", color: "#475569" }}>To: <strong style={{ color: "#1d2939" }}>{getCustomerName(expandedCustomer)}</strong></div>
+                            <div style={{ fontSize: "12px", color: "#667085", marginTop: "4px" }}>Period: {generatedStatement.from} to {generatedStatement.to}</div>
+                          </div>
+
+                          <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "24px", fontSize: "13px" }}>
+                            <thead>
+                              <tr style={{ background: "#f9fafb" }}>
+                                <th style={{ ...thStyle, borderBottom: "1.5px solid #eaecf0" }}>Account Summary</th>
+                                <th style={{ ...thStyle, borderBottom: "1.5px solid #eaecf0", textAlign: "right" }}>Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr style={{ borderBottom: "1px solid #eaecf0" }}><td style={tdStyle}>Opening Balance</td><td style={{ ...tdStyle, textAlign: "right" }}>₹{generatedStatement.openingBalance}</td></tr>
+                              <tr style={{ borderBottom: "1px solid #eaecf0" }}><td style={tdStyle}>Invoiced Amount</td><td style={{ ...tdStyle, textAlign: "right" }}>₹{generatedStatement.totalInvoiced}</td></tr>
+                              <tr style={{ borderBottom: "1px solid #eaecf0" }}><td style={tdStyle}>Amount Received</td><td style={{ ...tdStyle, textAlign: "right" }}>₹{generatedStatement.amountReceived}</td></tr>
+                              <tr style={{ fontWeight: "700", borderBottom: "1.5px solid #d0d5dd", background: "#f8fafc" }}><td style={tdStyle}>Balance Due</td><td style={{ ...tdStyle, textAlign: "right", color: "#006ee6" }}>₹{generatedStatement.balanceDue}</td></tr>
+                            </tbody>
+                          </table>
+
+                          <h4 style={{ margin: "0 0 12px 0", fontSize: "13px", color: "#344054", textTransform: "uppercase", letterSpacing: "0.03em" }}>Transactions</h4>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", marginBottom: "24px" }}>
+                            <thead>
+                              <tr style={{ background: "#f9fafb", textAlign: "left", borderBottom: "1.5px solid #eaecf0" }}>
+                                <th style={thStyle}>Date</th>
+                                <th style={thStyle}>Transaction</th>
+                                <th style={thStyle}>Details</th>
+                                <th style={{ ...thStyle, textAlign: "right" }}>Amount</th>
+                                <th style={{ ...thStyle, textAlign: "right" }}>Payments</th>
+                                <th style={{ ...thStyle, textAlign: "right" }}>Balance</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr style={{ borderBottom: "1px solid #eaecf0", fontStyle: "italic", color: "#667085" }}>
+                                <td style={tdStyle}>{generatedStatement.from}</td>
+                                <td style={tdStyle}>*** Opening Balance ***</td>
+                                <td style={tdStyle}></td>
+                                <td style={{ ...tdStyle, textAlign: "right" }}>₹{generatedStatement.openingBalance}</td>
+                                <td style={{ ...tdStyle, textAlign: "right" }}></td>
+                                <td style={{ ...tdStyle, textAlign: "right" }}>₹{generatedStatement.openingBalance}</td>
+                              </tr>
+                              {generatedStatement.rows.map((row, i) => (
+                                <tr key={i} style={{ borderBottom: "1px solid #eaecf0" }}>
+                                  <td style={tdStyle}>{row.date}</td>
+                                  <td style={tdStyle}>{row.transaction}</td>
+                                  <td style={tdStyle}>{row.details}</td>
+                                  <td style={{ ...tdStyle, textAlign: "right" }}>₹{row.amount}</td>
+                                  <td style={{ ...tdStyle, textAlign: "right" }}>₹{row.payments}</td>
+                                  <td style={{ ...tdStyle, textAlign: "right", fontWeight: "600" }}>₹{row.balance}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <button onClick={handlePrint} style={{ padding: "8px 16px", background: "#ffffff", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", color: "#344054", cursor: "pointer", fontWeight: "600" }}>🖨 Print</button>
+                            <button onClick={handleDownloadPDF} disabled={pdfLoading} style={{ padding: "8px 16px", background: "#ffffff", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", color: "#344054", cursor: "pointer", fontWeight: "600" }}>{pdfLoading ? 'Generating PDF...' : '⬇ Download PDF'}</button>
+                            <button onClick={handleDownloadXLS} style={{ padding: "8px 16px", background: "#ffffff", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", color: "#344054", cursor: "pointer", fontWeight: "600" }}>📥 XLS / CSV</button>
+                            <button onClick={openEmailModal} style={{ padding: "8px 16px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "13px", cursor: "pointer", fontWeight: "600" }}>✉ Send Email</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+
               </div>
-              <div style={{ marginBottom: '14px' }}>
+            ) : (
+              <div style={{ padding: "40px", textAlign: "center" }}>Customer not found.</div>
+            )
+          ) : (
+            // ==================== FULL LIST VIEW MODE ====================
+            <div style={{ padding: "32px", maxWidth: "1280px", margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+              
+              {/* List Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+                <div>
+                  <h2 style={{ fontSize: "22px", fontWeight: "700", color: "#1d2939", margin: 0 }}>Customers</h2>
+                  <p style={{ color: "#667085", margin: "4px 0 0", fontSize: "13px" }}>Showing {filteredCustomers.length} customers</p>
+                </div>
+                
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                  <select 
+                    value={statusFilter} 
+                    onChange={(e) => setStatusFilter(e.target.value)} 
+                    style={{ padding: "9px 12px", borderRadius: "6px", border: "1px solid #d0d5dd", outline: "none", color: "#344054", fontSize: "13px", background: "#ffffff", cursor: "pointer" }}
+                  >
+                    <option value="all">All Customers</option>
+                    <option value="active">Active Customers</option>
+                    <option value="inactive">Inactive Customers</option>
+                  </select>
+                  
+                  {canAccess(user?.role, MODULES.CUSTOMERS, ACTIONS.CREATE) && (
+                    <button 
+                      onClick={() => navigate("/customers/new")} 
+                      style={{ background: "#006ee6", color: "#ffffff", borderRadius: "6px", padding: "10px 18px", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "13px" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#0056b3"}
+                      onMouseLeave={e => e.currentTarget.style.background = "#006ee6"}
+                    >
+                      + New Customer
+                    </button>
+                  )}
+
+                  <div style={{ position: "relative" }}>
+                    <button 
+                      onClick={() => setMenuOpen(!menuOpen)} 
+                      style={{ background: "#ffffff", border: "1px solid #d0d5dd", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", color: "#344054" }}
+                    >
+                      ☰
+                    </button>
+                    
+                    {menuOpen && (
+                      <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "6px", background: "#ffffff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", zIndex: 100, minWidth: "160px" }}>
+                        <button style={menuItem} onClick={handleRefresh}>🔄 Refresh</button>
+                        <button style={menuItem} onClick={handleImport}>📥 Import Contacts</button>
+                        <div style={{ borderTop: "1px solid #eaecf0", margin: "4px 0" }}></div>
+                        <button style={menuItem} onClick={() => setColumnsOpen(!columnsOpen)}>📋 Columns ▸</button>
+                        
+                        {columnsOpen && (
+                          <div style={{ position: "absolute", right: "100%", top: 0, marginRight: "4px", background: "#ffffff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 25px rgba(0,0,0,0.08)", zIndex: 100, minWidth: "180px" }}>
+                            {ALL_COLUMNS.filter((c) => c.key !== "checkbox").map((col) => (
+                              <label key={col.key} style={{ display: "flex", alignItems: "center", padding: "8px 14px", cursor: "pointer" }}>
+                                <input type="checkbox" checked={visibleColumns[col.key] || false} onChange={() => setVisibleColumns((prev) => ({ ...prev, [col.key]: !prev[col.key] }))} />
+                                <span style={{ marginLeft: "8px", fontSize: "13px", color: "#344054" }}>{col.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* List Search Bar */}
+              <div style={{ marginBottom: "20px" }}>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", color: "#98a2b3" }}>🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search by name, email or company..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      const newParams = new URLSearchParams(location.search);
+                      if (e.target.value) newParams.set("search", e.target.value);
+                      else newParams.delete("search");
+                      navigate({ search: newParams.toString() }, { replace: true });
+                    }}
+                    style={{ width: "100%", padding: "12px 12px 12px 42px", borderRadius: "8px", border: "1px solid #d0d5dd", outline: "none", fontSize: "14px", boxSizing: "border-box" }}
+                    className="premium-input"
+                  />
+                </div>
+              </div>
+
+              {/* Bulk Actions Banner */}
+              {selected.length > 0 && (
+                <div style={{ background: "#f0f6ff", border: "1px solid #bae6fd", borderRadius: "8px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "20px" }}>
+                  <span style={{ color: "#0369a1", fontWeight: "600", fontSize: "13px" }}>{selected.length} customer(s) selected</span>
+                  <button onClick={deleteSelected} style={{ background: "#d92d20", color: "#ffffff", border: "none", borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Delete Selected</button>
+                  <button onClick={() => setSelected([])} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: "12px", textDecoration: "underline" }}>Cancel</button>
+                </div>
+              )}
+
+              {/* Table List Layout */}
+              <div style={{ background: "#ffffff", borderRadius: "10px", border: "1px solid #eaecf0", boxShadow: "0 1px 3px rgba(16, 24, 40, 0.05)", overflow: "hidden" }}>
+                {loading ? (
+                  <TableSkeleton rows={8} columns={6} />
+                ) : filteredCustomers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '80px 20px', color: '#98a2b3' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
+                    <h3 style={{ color: '#1d2939', marginBottom: '8px', fontSize: "16px", fontWeight: "600" }}>No customers found</h3>
+                    <p style={{ marginBottom: '20px', fontSize: "13px" }}>{searchQuery ? 'No customers match your search.' : 'Start by adding your first customer.'}</p>
+                    {!searchQuery && canAccess(user?.role, MODULES.CUSTOMERS, ACTIONS.CREATE) && (
+                      <button onClick={() => navigate('/customers/new')} style={{ background: "#006ee6", color: "#ffffff", borderRadius: "6px", padding: "10px 20px", border: "none", cursor: "pointer", fontWeight: "600", fontSize: "13px" }}>+ New Customer</button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                      <thead>
+                        <tr style={{ background: "#f9fafb", textAlign: "left", borderBottom: "1px solid #eaecf0" }}>
+                          {visibleColumns.checkbox && (
+                            <th style={{ ...thStyle, width: "40px" }}>
+                              <input type="checkbox" checked={selected.length === filteredCustomers.length && filteredCustomers.length > 0} onChange={toggleSelectAll} />
+                            </th>
+                          )}
+                          {renderHeader("name", "Name")}
+                          {renderHeader("company", "Company Name")}
+                          {renderHeader("email", "Email")}
+                          {renderHeader("workPhone", "Phone")}
+                          <th style={thStyle}>Status</th>
+                          <th style={thStyle}>Actions</th>
+                          {renderHeader("receivables", "Receivables")}
+                          {renderHeader("unusedCredits", "Unused Credits")}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredCustomers.map((c) => (
+                          <tr
+                            key={c.id}
+                            style={{ borderBottom: "1px solid #eaecf0", background: selected.includes(c.id) ? "#f0f6ff" : "transparent" }}
+                            className="hover-bg"
+                          >
+                            {visibleColumns.checkbox && (
+                              <td style={tdStyle}><input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelectOne(c.id)} /></td>
+                            )}
+                            {renderCell("name",
+                              <span style={{ color: "#006ee6", cursor: "pointer", fontWeight: "600" }} onClick={() => toggleExpand(c.id)}>{getCustomerName(c)}</span>
+                            )}
+                            {renderCell("company", c.company_name || "—")}
+                            {renderCell("email", c.email || "—")}
+                            {renderCell("workPhone", c.work_phone || c.phone || "—")}
+                            <td style={tdStyle}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: c.is_active ? "#ecfdf5" : "#f2f4f7", border: `1px solid ${c.is_active ? "#a7f3d0" : "#d0d5dd"}`, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "500", color: c.is_active ? "#047857" : "#475569" }}>
+                                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: c.is_active ? "#10b981" : "#6b7280" }}></span>
+                                {c.is_active ? "Active" : "Inactive"}
+                              </span>
+                            </td>
+                            <td style={tdStyle}>
+                              <div style={{ display: "flex", gap: "6px" }}>
+                                <button onClick={() => navigate('/customers/' + c.id)} style={{ padding: "4px 8px", background: "none", border: "1px solid #d0d5dd", color: "#344054", borderRadius: "4px", fontSize: "11px", cursor: "pointer", fontWeight: "500" }}>View</button>
+                                <button onClick={() => navigate('/customers/' + c.id + '/edit')} style={{ padding: "4px 8px", background: "none", border: "1px solid #d0d5dd", color: "#344054", borderRadius: "4px", fontSize: "11px", cursor: "pointer", fontWeight: "500" }}>Edit</button>
+                                <button onClick={() => handleSingleDelete(c.id)} style={{ padding: "4px 8px", background: "none", border: "1px solid #fecdca", color: "#d92d20", borderRadius: "4px", fontSize: "11px", cursor: "pointer", fontWeight: "500" }}>Delete</button>
+                                <button onClick={() => handleToggleStatus(c.id, c.is_active)} style={{ padding: "4px 8px", background: "none", border: "1px solid #d0d5dd", color: "#344054", borderRadius: "4px", fontSize: "11px", cursor: "pointer", fontWeight: "500" }}>
+                                  {c.is_active ? 'Mark Inactive' : 'Mark Active'}
+                                </button>
+                              </div>
+                            </td>
+                            {renderCell("receivables", `₹${c.opening_balance ? parseFloat(c.opening_balance).toFixed(2) : "0.00"}`)}
+                            {renderCell("unusedCredits", "₹0.00")}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
+      {/* ── Email Modal ── */}
+      {emailModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.4)', backdropFilter: "blur(4px)", zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#ffffff', borderRadius: '12px', padding: '28px 32px', width: '100%', maxWidth: '520px', boxShadow: '0 20px 40px rgba(0,0,0,0.12)', border: "1px solid #eaecf0" }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1d2939' }}>✉ Send Statement by Email</h3>
+              <button onClick={() => setEmailModalOpen(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#98a2b3' }}>✕</button>
+            </div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
                 <label style={modalLabelStyle}>To *</label>
-                <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@example.com" style={modalInputStyle} />
+                <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recipient@example.com" style={modalInputStyle} className="premium-input" />
               </div>
-              <div style={{ marginBottom: '14px' }}>
+              <div>
                 <label style={modalLabelStyle}>Subject</label>
-                <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={modalInputStyle} />
+                <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={modalInputStyle} className="premium-input" />
               </div>
-              <div style={{ marginBottom: '16px' }}>
+              <div>
                 <label style={modalLabelStyle}>Message</label>
-                <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={5} style={{ ...modalInputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-              </div>
-              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px', fontSize: '13px', color: '#0369a1' }}>
-                📎 The Statement of Accounts PDF will be automatically attached to this email.
-              </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button onClick={() => setEmailModalOpen(false)} style={secondaryBtn} disabled={emailSending}>Cancel</button>
-                <button onClick={handleSendEmail} disabled={emailSending || !emailTo.trim()} style={{ ...primaryBtn, opacity: (emailSending || !emailTo.trim()) ? 0.6 : 1 }}>
-                  {emailSending ? 'Sending...' : 'Send Email'}
-                </button>
+                <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={5} style={{ ...modalInputStyle, resize: 'vertical', fontFamily: 'inherit' }} className="premium-input" />
               </div>
             </div>
+
+            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '12px 14px', margin: '20px 0', fontSize: '12px', color: '#0284c7', fontWeight: "500" }}>
+              📎 The Statement of Accounts PDF will be automatically attached to this email.
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setEmailModalOpen(false)} style={{ padding: "8px 16px", background: "#ffffff", color: "#344054", border: "1px solid #d0d5dd", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }} disabled={emailSending}>Cancel</button>
+              <button onClick={handleSendEmail} disabled={emailSending || !emailTo.trim()} style={{ padding: "8px 16px", background: "#006ee6", color: "#ffffff", border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: "600", cursor: "pointer", opacity: (emailSending || !emailTo.trim()) ? 0.6 : 1 }}>
+                {emailSending ? 'Sending...' : 'Send Email'}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
     </div>
   );
 }
 
 const StatBox = ({ label, value, highlight }) => (
-  <div style={{ background: highlight ? "#e8f4fd" : "#f9fafb", borderRadius: "8px", padding: "15px 25px", minWidth: "120px", textAlign: "center" }}>
-    <div style={{ fontSize: "12px", color: "gray" }}>{label}</div>
-    <div style={{ fontSize: "18px", fontWeight: "bold", color: highlight ? "#2563eb" : "#333" }}>{value}</div>
+  <div style={{ background: highlight ? "#f0f6ff" : "#f8fafc", border: `1px solid ${highlight ? "#bae6fd" : "#eaecf0"}`, borderRadius: "8px", padding: "14px 20px", flex: 1, minWidth: "120px", textAlign: "center" }}>
+    <div style={{ fontSize: "11px", color: "#667085", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.03em" }}>{label}</div>
+    <div style={{ fontSize: "16px", fontWeight: "700", color: highlight ? "#006ee6" : "#344054", marginTop: "6px" }}>{value}</div>
   </div>
 );
 
-const primaryBtn = { padding: "10px 20px", background: "#4a90e2", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "500" };
-const secondaryBtn = { padding: "8px 16px", background: "#f0f0f0", color: "#333", border: "1px solid #ccc", borderRadius: "5px", cursor: "pointer" };
-const dropdownStyle = { padding: "8px 12px", borderRadius: "5px", border: "1px solid #ccc", fontSize: "14px" };
-const dropdownMenuStyle = { position: "absolute", right: 0, top: "100%", background: "#fff", borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", zIndex: 10, minWidth: "160px" };
-const menuItem = { display: "block", width: "100%", padding: "8px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap" };
-const editBtnStyle = { padding: "5px 10px", background: "orange", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", marginRight: "5px" };
-const inputStyle = { padding: "8px", borderRadius: "5px", border: "1px solid #ccc" };
-const labelStyle = { display: "block", fontSize: "13px", fontWeight: "500", marginBottom: "5px", color: "#333" };
-const inputStyleLarge = { width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", boxSizing: "border-box" };
-const modalLabelStyle = { display: 'block', fontSize: '13px', fontWeight: '500', color: '#374151', marginBottom: '6px' };
-const modalInputStyle = { width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px', boxSizing: 'border-box', outline: 'none' };
+
+
+const labelStyle = {
+  display: "block",
+  fontSize: "11px",
+  fontWeight: "600",
+  color: "#667085",
+  marginBottom: "4px",
+  textTransform: "uppercase",
+};
+
+const inputStyle = {
+  padding: "6px 8px",
+  borderRadius: "6px",
+  border: "1px solid #d0d5dd",
+  fontSize: "13px",
+  outline: "none",
+};
+
+const inputStyleLarge = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: "6px",
+  border: "1px solid #d0d5dd",
+  fontSize: "13px",
+  boxSizing: "border-box",
+};
+
+const menuItem = {
+  display: "block",
+  width: "100%",
+  padding: "10px 14px",
+  border: "none",
+  background: "none",
+  textAlign: "left",
+  cursor: "pointer",
+  fontSize: "13px",
+  color: "#344054",
+  transition: "background 0.1s ease",
+};
+
+const modalLabelStyle = {
+  display: 'block',
+  fontSize: '12px',
+  fontWeight: '600',
+  color: '#344054',
+  marginBottom: '6px',
+};
+
+const modalInputStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: '6px',
+  border: '1px solid #d0d5dd',
+  fontSize: '13px',
+  boxSizing: 'border-box',
+  outline: 'none',
+};
 
 export default Customers;

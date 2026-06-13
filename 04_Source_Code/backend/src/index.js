@@ -23,7 +23,27 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const invoicePreferencesRoutes = require("./routes/invoicePreferencesRoutes");
 const salespersonRoutes = require("./routes/salespersonRoutes");
 const projectRoutes = require("./routes/projectRoutes");
-
+const timesheetRoutes = require("./routes/timesheetRoutes");
+const recurringInvoiceRoutes = require("./routes/recurringInvoiceRoutes");
+const recurringExpenseRoutes = require("./routes/recurringExpenseRoutes");
+const transactionLockRoutes = require("./routes/transactionLockRoutes");
+const bulkUpdateRoutes = require("./routes/bulkUpdateRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const billRoutes = require("./routes/billRoutes");
+const taxRoutes = require("./routes/taxRoutes");
+const accountingRoutes = require("./routes/accountingRoutes");
+const reportsRoutes = require("./routes/reportsRoutes");
+const paymentMadeRoutes = require("./routes/paymentMadeRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const salesOrderRoutes = require("./routes/salesOrderRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const deliveryChallanRoutes = require("./routes/deliveryChallanRoutes");
+const creditNoteRoutes = require("./routes/creditNoteRoutes");
+const vendorCreditRoutes = require("./routes/vendorCreditRoutes");
+const globalSearchRoutes = require("./routes/globalSearchRoutes");
+const { initCronJobs } = require("./utils/cronJobs");
 
 // ✅ INIT APP
 const app = express();
@@ -70,7 +90,29 @@ app.use("/api", expenseRoutes);
 app.use("/api", bankRoutes);
 app.use("/api", salespersonRoutes);
 app.use("/api", projectRoutes);
+app.use("/api", timesheetRoutes);
+app.use("/api", recurringInvoiceRoutes);
+app.use("/api", recurringExpenseRoutes);
+app.use("/api", transactionLockRoutes);
+app.use("/api", bulkUpdateRoutes);
+app.use("/api", vendorRoutes);
+app.use("/api", billRoutes);
+app.use("/api", taxRoutes);
+app.use("/api", accountingRoutes);
+app.use("/api", reportsRoutes);
+app.use("/api", paymentMadeRoutes);
+app.use("/api", inventoryRoutes);
+app.use("/api", documentRoutes);
+app.use("/api/dashboard", authMiddleware, dashboardRoutes);
+app.use("/api", salesOrderRoutes);
+app.use("/api", purchaseOrderRoutes);
+app.use("/api", deliveryChallanRoutes);
+app.use("/api", creditNoteRoutes);
+app.use("/api", vendorCreditRoutes);
+app.use("/api/search", globalSearchRoutes);
 
+// ✅ INIT CRON JOBS
+initCronJobs();
 
 // ✅ TEST
 app.get('/', (req, res) => {

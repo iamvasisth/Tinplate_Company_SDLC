@@ -15,6 +15,7 @@ function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [organizationName, setOrganizationName] = useState("");
   const [businessType, setBusinessType] = useState("Other");
+  const [role, setRole] = useState("Admin");
 
   const navigate = useNavigate();
 
@@ -44,6 +45,7 @@ function Register() {
           password,
           organization_name: organizationName,
           business_type: businessType,
+          role: role
         }),
       });
 
@@ -61,9 +63,8 @@ function Register() {
   return (
     <div className="auth-page register-page">
       <div className="register-wrapper">
-        <div className="register-brand">
-          <span className="register-book-icon"></span>
-          <span>RUPP Books</span>
+        <div className="register-brand" style={{ marginBottom: "20px" }}>
+          <img src="/logo.png" alt="Logo" style={{ height: "90px", maxWidth: "100%", objectFit: "contain" }} />
         </div>
 
         <h1 className="register-title">Create your account</h1>
@@ -144,19 +145,17 @@ function Register() {
               </div>
 
               <div className="auth-field">
-                <label htmlFor="register-business">Your Role</label>
+                <label htmlFor="register-role">System Access Role</label>
                 <select
-                  id="register-business"
+                  id="register-role"
                   className="auth-input auth-select"
-                  value={businessType}
-                  onChange={(e) => setBusinessType(e.target.value)}
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
                 >
-                  <option value="Other">Select your role</option>
-                  <option value="Owner">Owner</option>
-                  <option value="Accountant">Accountant</option>
-                  <option value="Manager">Manager</option>
-                  <option value="Employee">Employee</option>
-                  <option value="Other">Other</option>
+                  <option value="Admin">Admin (Full Access)</option>
+                  <option value="Accountant">Accountant (Manage Books)</option>
+                  <option value="Staff">Staff (Create/Edit Basic Data)</option>
+                  <option value="Viewer">Viewer (Read Only)</option>
                 </select>
               </div>
             </div>

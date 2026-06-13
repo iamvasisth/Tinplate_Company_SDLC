@@ -1,630 +1,343 @@
-/* ================================================
-   Dashboard.css – Zoho Books-style dashboard cards
-   Fully responsive across all breakpoints
-   ================================================ */
+/* Dashboard.css - Premium UI Overhaul */
 
-/* ── Welcome Section ── */
+.dashboard-container {
+  padding: 15px 30px;
+  max-width: 1500px;
+  margin: 0 auto;
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-global);
+  min-height: 100vh;
+}
+
+/* Welcome Header */
 .dash-welcome {
-  background: white;
-  padding: 28px 34px 22px;
+  margin-bottom: 15px;
+}
+
+.dash-welcome-content {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  border-bottom: 1px solid #e4e8f2;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
-.dash-welcome-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 10px;
-  background: #f0f3f8;
-  display: grid;
-  place-items: center;
-  font-size: 24px;
-  flex-shrink: 0;
+.dash-welcome-title { 
+  font-size: 20px; 
+  font-weight: 700; 
+  margin: 0 0 4px 0; 
+  color: var(--text-primary); 
+  letter-spacing: -0.5px;
 }
 
-.dash-welcome-title {
-  margin: 0 0 4px;
-  font-size: clamp(20px, 3vw, 26px);
-  font-weight: 700;
-  color: #101828;
+.dash-welcome-sub { 
+  color: var(--text-muted); 
+  margin: 0; 
+  font-size: 13px; 
 }
 
-.dash-welcome-sub {
-  margin: 0;
-  color: #667085;
-  font-size: 14px;
-}
-
-/* ── Tabs ── */
-.dash-tabs {
-  background: white;
-  border-bottom: 1px solid #e4e8f2;
-  padding: 0 34px;
-  display: flex;
-  gap: 28px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Hide scrollbar on tabs for cleanliness */
-.dash-tabs::-webkit-scrollbar {
-  height: 0;
-}
-
-.dash-tab {
-  border: 0;
-  background: transparent;
-  color: #344054;
-  padding: 14px 0;
+.dash-filter-select {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  outline: none;
+  background: var(--bg-input);
   font-size: 14px;
   font-weight: 500;
-  white-space: nowrap;
+  color: var(--text-secondary);
   cursor: pointer;
-  border-bottom: 3px solid transparent;
-  transition: color 0.2s, border-color 0.2s;
-  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin-left: 10px;
+}
+.dash-filter-select:focus, .dash-filter-select:hover {
+  border-color: var(--border-color-hover);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.dash-tab:hover {
-  color: #2f80ed;
-}
-
-.dash-tab:focus-visible {
-  outline: 2px solid #2f80ed;
-  outline-offset: -2px;
-}
-
-.dash-tab.active {
-  color: #2f80ed;
-  border-bottom-color: #2f80ed;
-  font-weight: 600;
-}
-
-/* ── Cards Grid ── */
-.dash-cards-grid {
-  padding: 28px 34px;
+/* Stats Grid (Top Summary) */
+.dash-stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-  align-items: start;
-  max-width: 100%;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
 }
 
-/* ── Card ── */
-.dash-card {
-  background: white;
-  border: 1px solid #e4e8f2;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
-  transition: box-shadow 0.2s;
-  min-width: 0; /* prevent grid blowout */
+.dash-stat-card {
+  background: var(--bg-card); 
+  padding: 18px; 
+  border-radius: 14px; 
+  border: 1px solid var(--border-color);
+  display: flex; 
+  flex-direction: column; 
+  gap: 12px; 
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.25s ease;
 }
 
-.dash-card:hover {
-  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+.dash-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.15);
+  border-color: #cbd5e1;
 }
 
-.dash-card-wide {
-  grid-column: 1 / -1;
-}
-
-.dash-card-header {
-  min-height: 52px;
-  padding: 0 22px;
-  background: #fafbff;
-  border-bottom: 1px solid #e4e8f2;
+.dash-stat-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.dash-card-header h3 {
-  margin: 0;
-  font-size: clamp(14px, 1.5vw, 16px);
-  font-weight: 600;
-  color: #101828;
-  white-space: nowrap;
-}
-
-.dash-card-action,
-.dash-card-dropdown {
-  margin-left: auto;
-  border: 0;
-  background: transparent;
-  color: #2f80ed;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.dash-card-action:hover,
-.dash-card-dropdown:hover {
-  background: rgba(47, 128, 237, 0.08);
-}
-
-.dash-card-body {
-  padding: 22px;
-  min-height: 160px;
-  overflow-x: auto;
-}
-
-/* ── Muted text ── */
-.dash-muted {
-  color: #667085;
-  font-size: 14px;
-}
-
-/* ── Amount ── */
-.dash-amount {
-  margin: 8px 0 16px;
-  font-size: clamp(18px, 2vw, 22px);
-  font-weight: 700;
-  color: #101828;
-}
-
-/* ── Bar / Legend ── */
-.dash-bar {
-  height: 12px;
-  background: #eef1f6;
-  border-radius: 999px;
-  margin: 14px 0;
-}
-
-.dash-legend {
+.dash-stat-icon {
+  width: 44px; height: 44px; 
+  border-radius: 10px; 
   display: flex;
-  gap: 16px;
+  align-items: center; justify-content: center; 
+}
+.dash-stat-icon.receivables { background: #fef3c7; color: #d97706; }
+.dash-stat-icon.payables { background: #fee2e2; color: #dc2626; }
+.dash-stat-icon.income { background: #dcfce7; color: #16a34a; }
+.dash-stat-icon.expenses { background: #f3e8ff; color: #7e22ce; }
+
+.dash-stat-header p { margin: 0; color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 0.3px; }
+.dash-stat-content h3 { margin: 0; font-size: 20px; color: var(--text-primary); font-weight: 700; letter-spacing: -0.5px; }
+.dash-stat-content { display: flex; flex-direction: column; gap: 4px; }
+.dash-stat-trend { font-size: 12px; font-weight: 600; }
+.trend-up { color: #10b981; }
+.trend-down { color: #ef4444; }
+
+/* Section Titles */
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+}
+
+.dash-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  gap: 15px;
   flex-wrap: wrap;
-  font-size: 13px;
-  color: #344054;
 }
 
-.dash-dot-blue,
-.dash-dot-orange {
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-  border-radius: 3px;
-  margin-right: 5px;
-  vertical-align: middle;
+/* Monthly Overview Section */
+.dash-monthly-overview {
+  margin-bottom: 20px;
 }
 
-.dash-dot-blue {
-  background: #1a73e8;
-}
-
-.dash-dot-orange {
-  background: #ff8a00;
-}
-
-/* ── Cash Flow ── */
-.dash-cash-layout {
+.monthly-overview-grid {
   display: grid;
-  grid-template-columns: 1fr 200px;
-  gap: 30px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
 }
 
-.dash-chart,
-.dash-mini-chart {
-  height: 210px;
-  border-left: 1px solid #e4e8f2;
-  border-bottom: 1px solid #e4e8f2;
-  margin-left: 32px;
-  position: relative;
+.mo-card {
+  background: var(--bg-card);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.mo-label {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.mo-amount {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.income-color { color: #16a34a; }
+.expense-color { color: #dc2626; }
+.cash-color { color: #2563eb; }
+
+/* Projections Grid */
+.dash-projections-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.proj-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.proj-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.proj-amount {
+  font-size: 20px;
+  margin: 0 0 10px 0;
+  font-weight: 700;
+}
+.proj-list-item {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-color);
+  padding: 6px 0;
+  font-size: 13px;
+}
+.proj-list-item:last-child {
+  border-bottom: none;
+}
+.proj-list-title { margin: 0; font-weight: 600; color: var(--text-secondary); }
+.proj-list-amount { font-weight: 700; color: var(--text-primary); }
+
+.badge-surplus {
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-top: 10px;
+}
+
+.badge-shortage {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-top: 10px;
+}
+
+/* Dashboard Layout Grid (70/30 split) */
+.zoho-dashboard-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.main-charts-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.side-widgets-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Premium Zoho-style Card Aesthetics */
+.dash-widget-card {
+  background: var(--bg-card);
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   min-width: 0;
 }
 
-.dash-mini-chart {
-  height: 160px;
-  margin-top: 16px;
-}
-
-.dash-chart-line {
-  height: 35px;
-  border-top: 1px dashed #dbe1ef;
-  position: relative;
-}
-
-.dash-chart-line span {
-  position: absolute;
-  left: -34px;
-  top: -8px;
-  color: #667085;
-  font-size: 11px;
-}
-
-.dash-months {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  margin-top: 6px;
-  color: #667085;
-  font-size: 11px;
-  overflow-x: auto;
-}
-
-.dash-cash-info {
-  color: #475569;
+.widget-title {
   font-size: 14px;
-}
-
-.dash-cash-info p {
-  margin: 0 0 4px;
-}
-
-.dash-cash-info h3 {
-  margin: 0 0 18px;
-  font-size: 16px;
   font-weight: 700;
-}
-
-.dash-green-text {
-  color: #10b981;
-}
-
-.dash-red-text {
-  color: #ef4444;
-}
-
-/* ── Income & Expense ── */
-.dash-income-row {
+  color: var(--text-primary);
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
-  gap: 36px;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.dash-green-dot,
-.dash-red-dot {
-  width: 10px;
-  height: 10px;
-  display: inline-block;
-  border-radius: 3px;
-  margin-right: 5px;
-  vertical-align: middle;
-}
-
-.dash-green-dot {
-  background: #10b981;
-}
-
-.dash-red-dot {
-  background: #ef4444;
-}
-
-.dash-accrual-cash {
-  margin-left: auto;
-  display: flex;
-  gap: 4px;
-}
-
-.dash-badge {
-  padding: 4px 10px;
-  border: 1px solid #e4e8f2;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #667085;
-  cursor: pointer;
-  background: white;
-  transition: background 0.15s, color 0.15s;
-}
-
-.dash-badge.active {
-  background: #ff9800;
-  color: white;
-  border-color: #ff9800;
-}
-
-/* ── Note ── */
-.dash-note {
-  color: #667085;
+.view-link {
   font-size: 13px;
-  margin-top: 14px;
+  color: #3b82f6;
+  font-weight: 600;
+  text-decoration: none;
+}
+.view-link:hover { text-decoration: underline; }
+
+.chart-container {
+  width: 100%;
+  height: 300px;
+  margin-top: 10px;
+  overflow: hidden;
+  min-width: 0;
+}
+.chart-container.small {
+  height: 250px;
 }
 
-/* ── Empty box ── */
-.dash-empty-box {
-  min-height: 200px;
-  display: grid;
-  place-items: center;
-  color: #667085;
+/* Empty States */
+.dash-loading { text-align: center; padding: 50px; color: var(--text-muted); font-weight: 500; }
+.widget-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 150px;
+  color: var(--text-muted);
   font-size: 14px;
   text-align: center;
-  padding: 20px;
 }
+.widget-empty svg { margin-bottom: 12px; color: #cbd5e1; }
 
-/* ── Business Modules ── */
-.dash-modules {
-  padding: 0 34px 36px;
+/* Quick Shortcuts Links */
+.dash-shortcuts-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
-
-.dash-modules h2 {
-  font-size: clamp(18px, 2vw, 20px);
-  font-weight: 700;
-  color: #101828;
-  margin: 0 0 4px;
-}
-
-.dash-module-grid {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 14px;
-}
-
-.dash-module-card {
-  min-height: 96px;
-  border: 1px solid #e4e8f2;
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
+.shortcut-chip {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
-  color: #101828;
   cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s, transform 0.15s;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+.shortcut-chip:hover {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+  transform: translateY(-1px);
 }
 
-.dash-module-card:hover {
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
-  border-color: #2f80ed;
-  transform: translateY(-2px);
+/* Responsive Styles */
+@media (max-width: 1200px) {
+  .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .monthly-overview-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-.dash-module-card:focus-visible {
-  outline: 2px solid #2f80ed;
-  outline-offset: 2px;
+@media (max-width: 1024px) {
+  .zoho-dashboard-layout { grid-template-columns: 1fr; }
+  .dash-projections-grid { grid-template-columns: repeat(2, 1fr); }
+  .dash-welcome-content { flex-direction: column; align-items: flex-start; gap: 15px; }
+  .dash-filter-select { margin-left: 0; margin-right: 10px; }
 }
 
-/* ================================================================
-   RESPONSIVE BREAKPOINTS
-   ================================================================ */
-
-/* ── Tablet: ≤ 1100px ── */
-@media (max-width: 1100px) {
-  .dash-cards-grid {
-    grid-template-columns: 1fr;
-    padding: 22px 24px;
-    gap: 20px;
-  }
-
-  .dash-card-wide {
-    grid-column: 1;
-  }
-
-  .dash-cash-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .dash-welcome {
-    padding: 22px 24px 18px;
-  }
-
-  .dash-tabs {
-    padding: 0 24px;
-  }
-
-  .dash-modules {
-    padding: 0 24px 30px;
-  }
-
-  .dash-income-row {
-    gap: 24px;
-  }
-}
-
-/* ── Mobile: ≤ 768px ── */
 @media (max-width: 768px) {
-  .dash-welcome {
-    padding: 18px 16px 14px;
-    gap: 12px;
-  }
-
-  .dash-welcome-avatar {
-    width: 42px;
-    height: 42px;
-    font-size: 20px;
-  }
-
-  .dash-welcome-sub {
-    font-size: 13px;
-  }
-
-  .dash-tabs {
-    padding: 0 16px;
-    gap: 20px;
-  }
-
-  .dash-tab {
-    font-size: 13px;
-    padding: 12px 0;
-  }
-
-  .dash-cards-grid {
-    padding: 16px;
-    gap: 16px;
-  }
-
-  .dash-card-header {
-    padding: 0 16px;
-    min-height: 46px;
-  }
-
-  .dash-card-body {
-    padding: 16px;
-    min-height: 120px;
-  }
-
-  .dash-empty-box {
-    min-height: 140px;
-    font-size: 13px;
-  }
-
-  .dash-chart,
-  .dash-mini-chart {
-    margin-left: 24px;
-    height: 180px;
-  }
-
-  .dash-mini-chart {
-    height: 130px;
-  }
-
-  .dash-chart-line {
-    height: 30px;
-  }
-
-  .dash-chart-line span {
-    left: -28px;
-    font-size: 10px;
-  }
-
-  .dash-months {
-    font-size: 9px;
-    gap: 0;
-  }
-
-  .dash-cash-info h3 {
-    font-size: 14px;
-    margin-bottom: 12px;
-  }
-
-  .dash-cash-info {
-    font-size: 13px;
-  }
-
-  .dash-income-row {
-    gap: 16px;
-  }
-
-  .dash-accrual-cash {
-    margin-left: 0;
-    margin-top: 8px;
-  }
-
-  .dash-modules {
-    padding: 0 16px 24px;
-  }
-
-  .dash-module-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
-  }
-
-  .dash-module-card {
-    min-height: 80px;
-    padding: 14px;
-    font-size: 13px;
-    border-radius: 10px;
-  }
-
-  .dash-legend {
-    gap: 10px;
-    font-size: 12px;
-  }
-}
-
-/* ── Very small screens: ≤ 480px ── */
-@media (max-width: 480px) {
-  .dash-welcome {
-    padding: 14px 12px;
-  }
-
-  .dash-welcome-avatar {
-    width: 36px;
-    height: 36px;
-    font-size: 16px;
-    border-radius: 8px;
-  }
-
-  .dash-tabs {
-    padding: 0 12px;
-    gap: 16px;
-  }
-
-  .dash-tab {
-    font-size: 12px;
-    padding: 10px 0;
-  }
-
-  .dash-cards-grid {
-    padding: 12px;
-    gap: 12px;
-  }
-
-  .dash-card {
-    border-radius: 10px;
-  }
-
-  .dash-card-header {
-    padding: 0 12px;
-    min-height: 42px;
-  }
-
-  .dash-card-header h3 {
-    font-size: 13px;
-  }
-
-  .dash-card-action,
-  .dash-card-dropdown {
-    font-size: 12px;
-    padding: 3px 6px;
-  }
-
-  .dash-card-body {
-    padding: 12px;
-    min-height: 100px;
-  }
-
-  .dash-chart,
-  .dash-mini-chart {
-    height: 150px;
-    margin-left: 20px;
-  }
-
-  .dash-mini-chart {
-    height: 110px;
-  }
-
-  .dash-chart-line {
-    height: 25px;
-  }
-
-  .dash-chart-line span {
-    left: -22px;
-    font-size: 9px;
-  }
-
-  .dash-months {
-    font-size: 8px;
-  }
-
-  .dash-module-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .dash-module-card {
-    min-height: 70px;
-    padding: 12px;
-  }
-
-  .dash-empty-box {
-    min-height: 100px;
-    font-size: 12px;
-  }
-
-  .dash-note {
-    font-size: 11px;
-  }
-
-  .dash-bar {
-    height: 10px;
-  }
+  .dashboard-container { padding: 20px 15px; overflow-x: hidden; }
+  .dash-stats-grid { grid-template-columns: 1fr; }
+  .dash-projections-grid { grid-template-columns: 1fr; }
+  .monthly-overview-grid { grid-template-columns: 1fr; }
+  .dash-section-header { flex-direction: column; align-items: flex-start; }
+  .dash-welcome-filters { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; }
 }

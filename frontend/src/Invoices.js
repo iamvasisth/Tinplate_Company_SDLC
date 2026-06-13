@@ -1,22 +1,21 @@
 /**
- * Invoices.js – Invoice list with search/filter, expanded status badges,
- * inline expandable detail, send email modal, record payment modal.
+ * Invoices.js – Redesigned Invoices List UI (Zoho Books style)
+ * Modernized with an empty-state flowchart, bulk actions, and clean filter controls.
  */
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
-const ORG_NAME = "Tinplate Computer Training Center";
-
 const STATUS_COLORS = {
-  draft:          { bg: "#e2e3e5", color: "#383d41" },
-  sent:           { bg: "#fff3cd", color: "#856404" },
-  unpaid:         { bg: "#ffeeba", color: "#856404" },
-  partially_paid: { bg: "#d1ecf1", color: "#0c5460" },
-  paid:           { bg: "#d4edda", color: "#155724" },
-  overdue:        { bg: "#f8d7da", color: "#721c24" },
-  cancelled:      { bg: "#e2e3e5", color: "#6c757d" },
+  draft:          { bg: "#f1f5f9", color: "#475569", label: "DRAFT" },
+  sent:           { bg: "#fffbeb", color: "#b45309", label: "SENT" },
+  unpaid:         { bg: "#fffbeb", color: "#b45309", label: "UNPAID" },
+  partially_paid: { bg: "#eff6ff", color: "#1d4ed8", label: "PARTIALLY PAID" },
+  paid:           { bg: "#f0fdf4", color: "#15803d", label: "PAID" },
+  overdue:        { bg: "#fef2f2", color: "#b91c1c", label: "OVERDUE" },
+  cancelled:      { bg: "#f1f5f9", color: "#475569", label: "CANCELLED" },
 };
 
 function Invoices() {
@@ -26,43 +25,51 @@ function Invoices() {
   const [invoices, setInvoices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Search and Filter
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-
-  const [expandedId, setExpandedId] = useState(null);
-  const [expandedInvoice, setExpandedInvoice] = useState(null);
-  const [expandedItems, setExpandedItems] = useState([]);
-  const [expandedLoading, setExpandedLoading] = useState(false);
-
-  // Email modal
-  const [showEmailModal, setShowEmailModal] = useState(false);
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailBody, setEmailBody] = useState("");
-
-  // Payment modal
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [paymentMode, setPaymentMode] = useState("cash");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [paymentNotes, setPaymentNotes] = useState("");
-
-  const [menuOpenFor, setMenuOpenFor] = useState(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [filterSearch, setFilterSearch] = useState("");
+  
+  // Selection
+  const [selectedIds, setSelectedIds] = useState([]);
+  
+  // Menus
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [sortSubMenuOpen, setSortSubMenuOpen] = useState(false);
+  const [exportSubMenuOpen, setExportSubMenuOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const [sortBy, setSortBy] = useState("invoice_date");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [favoriteView, setFavoriteView] = useState(() => localStorage.getItem("favInvoiceView") || null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [invRes, custRes] = await Promise.all([
+      const [invRes, customersRes] = await Promise.all([
         apiRequest("/invoices"),
         apiRequest("/customers"),
       ]);
-      setInvoices(invRes?.invoices || []);
-      setCustomers(custRes?.customers || []);
-    } catch (err) { toast.error("Failed to load invoices"); }
-    finally { setLoading(false); }
+      setInvoices(Array.isArray(invRes?.invoices) ? invRes.invoices : []);
+      setCustomers(Array.isArray(customersRes?.customers) ? customersRes.customers : []);
+    } catch (err) { 
+      toast.error("Failed to load Invoices"); 
+    } finally { 
+      setLoading(false); 
+    }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData, location.state?.refresh]);
+  useEffect(() => { 
+    fetchData(); 
+  }, [fetchData, location.state?.refresh]);
+
+  useEffect(() => {
+    const fav = localStorage.getItem("favInvoiceView");
+    if (fav) {
+      setStatusFilter(fav);
+    }
+  }, []);
 
   const getCustomerName = (customerId) => {
     if (!customerId) return "—";
@@ -70,8 +77,7 @@ function Invoices() {
     return cust ? cust.display_name || [cust.first_name, cust.last_name].filter(Boolean).join(" ") || cust.email : "—";
   };
 
-  const getCustomerById = (customerId) => customers.find(c => c.id === customerId) || {};
-
+  // Filter Invoices
   const filteredInvoices = invoices.filter(inv => {
     const matchSearch = search === "" ||
       (inv.invoice_number || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -80,256 +86,463 @@ function Invoices() {
     return matchSearch && matchStatus;
   });
 
-  const toggleExpand = async (invId) => {
-    if (expandedId === invId) { setExpandedId(null); setExpandedInvoice(null); setExpandedItems([]); return; }
-    setExpandedId(invId);
-    setExpandedLoading(true);
-    try {
-      const res = await apiRequest(`/invoices/${invId}`);
-      if (res?.invoice) { setExpandedInvoice(res.invoice); setExpandedItems(res.items || []); }
-    } catch (err) { toast.error("Failed to load invoice details"); setExpandedId(null); }
-    finally { setExpandedLoading(false); }
+  // Sort Invoices
+  const sortedInvoices = [...filteredInvoices].sort((a, b) => {
+    let aVal = a[sortBy];
+    let bVal = b[sortBy];
+
+    if (sortBy === "customer_name") {
+      aVal = getCustomerName(a.customer_id).toLowerCase();
+      bVal = getCustomerName(b.customer_id).toLowerCase();
+    } else if (sortBy === "total") {
+      aVal = parseFloat(a.total_amount) || 0;
+      bVal = parseFloat(b.total_amount) || 0;
+    } else if (sortBy === "invoice_date") {
+      aVal = new Date(a.invoice_date).getTime();
+      bVal = new Date(b.invoice_date).getTime();
+    } else if (sortBy === "invoice_number") {
+      aVal = (a.invoice_number || "").toLowerCase();
+      bVal = (b.invoice_number || "").toLowerCase();
+    }
+
+    if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // Selection helpers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(sortedInvoices.map(s => s.id));
+    } else {
+      setSelectedIds([]);
+    }
   };
 
-  const changeStatus = async (invId, newStatus) => {
-    try {
-      await apiRequest(`/invoices/${invId}`, { method: "PUT", body: JSON.stringify({ status: newStatus }) });
-      toast.success(`Invoice marked as ${newStatus}`);
-      setInvoices(prev => prev.map(i => i.id === invId ? { ...i, status: newStatus } : i));
-      if (expandedInvoice?.id === invId) setExpandedInvoice({ ...expandedInvoice, status: newStatus });
-    } catch (err) { toast.error("Failed to update status"); }
+  const handleSelectOne = (e, id) => {
+    e.stopPropagation();
+    if (e.target.checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this invoice?")) return;
+  const handleDeleteSelected = async () => {
+    if (!window.confirm(`Delete the ${selectedIds.length} selected Invoices?`)) return;
     try {
-      await apiRequest(`/invoices/${id}`, { method: "DELETE" });
-      toast.success("Invoice deleted");
-      if (expandedId === id) { setExpandedId(null); setExpandedInvoice(null); setExpandedItems([]); }
+      await Promise.all(selectedIds.map(id => apiRequest(`/invoices/${id}`, { method: "DELETE" })));
+      toast.success("Invoices deleted successfully");
+      setSelectedIds([]);
       fetchData();
-    } catch (err) { toast.error("Delete failed"); }
+    } catch (err) {
+      toast.error("Failed to delete selected Invoices");
+    }
   };
 
-  const openEmailModal = (invoice) => {
-    const cust = getCustomerById(invoice.customer_id);
-    setEmailSubject(`Invoice ${invoice.invoice_number} from ${ORG_NAME}`);
-    setEmailBody(`Dear ${cust.display_name || "Customer"},\n\nPlease find your invoice attached.\n\nInvoice Number: ${invoice.invoice_number}\nTotal: ₹${parseFloat(invoice.total_amount).toFixed(2)}\n\nThank you for your business.\n\nRegards,\n${ORG_NAME}`);
-    setShowEmailModal(true);
+  const handleExportCSV = () => {
+    const headers = ["Invoice Number", "Customer Name", "Date", "Status", "Amount", "Balance Due"];
+    const rows = sortedInvoices.map(inv => [
+      inv.invoice_number,
+      getCustomerName(inv.customer_id),
+      new Date(inv.invoice_date).toLocaleDateString("en-GB"),
+      inv.status,
+      inv.total_amount,
+      inv.balance_due
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `invoices_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Invoices exported as CSV!");
   };
 
-  const sendEmailAndMarkSent = async () => {
-    if (!expandedInvoice) return;
-    try {
-      await apiRequest(`/invoices/${expandedInvoice.id}/send`, {
-        method: "POST",
-        body: JSON.stringify({ to: getCustomerById(expandedInvoice.customer_id).email || "", subject: emailSubject, body: emailBody }),
-      });
-      toast.success("Email sent & invoice marked as sent");
-      setShowEmailModal(false);
-      changeStatus(expandedInvoice.id, "sent");
-    } catch (err) { toast.error("Failed to send email"); }
-  };
-
-  const handleRecordPayment = async () => {
-    if (!paymentAmount || parseFloat(paymentAmount) <= 0) { toast.error("Enter a valid amount"); return; }
-    if (!expandedInvoice) return;
-    try {
-      const res = await apiRequest(`/invoices/${expandedInvoice.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({
-          amount: parseFloat(paymentAmount),
-          payment_date: paymentDate,
-          payment_mode: paymentMode,
-          reference: paymentReference,
-          notes: paymentNotes,
-        }),
-      });
-      toast.success("Payment recorded");
-      const newBalance = res.newBalanceDue;
-      if (newBalance <= 0) changeStatus(expandedInvoice.id, "paid");
-      setShowPaymentModal(false);
-      setPaymentAmount(""); setPaymentReference(""); setPaymentNotes("");
-    } catch (err) { toast.error("Failed to record payment"); }
+  const handleExportJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sortedInvoices, null, 2));
+    const link = document.createElement("a");
+    link.setAttribute("href", dataStr);
+    link.setAttribute("download", `invoices_export_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Invoices exported as JSON!");
   };
 
   const statusBadge = (status) => {
     const colors = STATUS_COLORS[status] || STATUS_COLORS.draft;
     return (
-      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "500", background: colors.bg, color: colors.color, textTransform: "capitalize" }}>
-        {status?.replace("_", " ")}
+      <span
+        style={{
+          padding: "3px 8px",
+          borderRadius: "4px",
+          fontSize: "11px",
+          fontWeight: "600",
+          background: colors.bg,
+          color: colors.color,
+          letterSpacing: "0.03em",
+          display: "inline-block",
+        }}
+      >
+        {colors.label}
       </span>
     );
   };
 
+  const getFilterLabel = (filter) => {
+    switch (filter) {
+      case "all": return "All Invoices";
+      case "draft": return "Draft Invoices";
+      case "sent": return "Sent Invoices";
+      case "unpaid": return "Unpaid Invoices";
+      case "partially_paid": return "Partially Paid Invoices";
+      case "paid": return "Paid Invoices";
+      case "overdue": return "Overdue Invoices";
+      case "cancelled": return "Cancelled Invoices";
+      default: return "All Invoices";
+    }
+  };
+
+  const allViews = [
+    { key: "all", label: "All" },
+    { key: "draft", label: "Draft" },
+    { key: "sent", label: "Sent" },
+    { key: "unpaid", label: "Unpaid" },
+    { key: "partially_paid", label: "Partially Paid" },
+    { key: "paid", label: "Paid" },
+    { key: "overdue", label: "Overdue" },
+    { key: "cancelled", label: "Cancelled" },
+  ];
+
+  const filteredViews = allViews.filter(v => v.label.toLowerCase().includes(filterSearch.toLowerCase()));
+
   return (
-    <div style={{ padding: "30px", maxWidth: "1100px", margin: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h2>Invoices</h2>
-        <button onClick={() => navigate("/invoices/new")} style={primaryBtn}>+ New Invoice</button>
-      </div>
+    <div style={{ background: "#ffffff", minHeight: "100vh", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+      {/* Header Area */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 24px", borderBottom: "1px solid #eaecf0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+          <h2 
+            onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+            style={{ fontSize: "20px", fontWeight: "600", color: "#1d2939", margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
+          >
+            {getFilterLabel(statusFilter)}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: statusDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </h2>
 
-      {/* Search & Filter */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "15px", flexWrap: "wrap" }}>
-        <input type="text" placeholder="Search by invoice # or customer..." value={search} onChange={e => setSearch(e.target.value)}
-          style={{ ...inputStyle, maxWidth: "300px" }} />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inputStyle, maxWidth: "170px" }}>
-          <option value="all">All Status</option>
-          <option value="draft">Draft</option><option value="sent">Sent</option>
-          <option value="unpaid">Unpaid</option><option value="partially_paid">Partially Paid</option>
-          <option value="paid">Paid</option><option value="overdue">Overdue</option><option value="cancelled">Cancelled</option>
-        </select>
-      </div>
+          {statusDropdownOpen && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                top: "100%",
+                marginTop: "8px",
+                background: "#ffffff",
+                border: "1px solid #eaecf0",
+                borderRadius: "8px",
+                boxShadow: "0 10px 30px rgba(16, 24, 40, 0.08)",
+                zIndex: 1000,
+                width: "280px",
+                padding: "10px 0",
+              }}
+            >
+              {/* Search views */}
+              <div style={{ padding: "0 12px 10px 12px", borderBottom: "1px solid #f2f4f7" }}>
+                <div style={{ position: "relative", width: "100%" }}>
+                  <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", display: "flex" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Search Views"
+                    value={filterSearch}
+                    onChange={(e) => setFilterSearch(e.target.value)}
+                    style={{
+                      width: "100%", padding: "8px 10px 8px 30px", borderRadius: "6px", border: "1px solid #d0d5dd",
+                      fontSize: "13px", boxSizing: "border-box", outline: "none"
+                    }}
+                  />
+                </div>
+              </div>
 
-      {loading ? <p>Loading...</p> : filteredInvoices.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px", color: "gray" }}>
-          <p>No invoices found.</p>
-          <button onClick={() => navigate("/invoices/new")} style={{ ...primaryBtn, marginTop: "15px" }}>+ New Invoice</button>
-        </div>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-          <thead>
-            <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-              <th style={thStyle}>Invoice #</th><th style={thStyle}>Date</th>
-              <th style={thStyle}>Customer</th><th style={thStyle}>Status</th><th style={thStyle}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredInvoices.map(inv => (
-              <React.Fragment key={inv.id}>
-                <tr style={{ borderBottom: "1px solid #e2e8f0", cursor: "pointer" }} onClick={() => toggleExpand(inv.id)}>
-                  <td style={tdStyle}><span style={{ color: "#4a90e2", textDecoration: "underline" }}>{inv.invoice_number}</span></td>
-                  <td style={tdStyle}>{new Date(inv.invoice_date).toLocaleDateString()}</td>
-                  <td style={tdStyle}>{getCustomerName(inv.customer_id)}</td>
-                  <td style={tdStyle}>{statusBadge(inv.status)}</td>
-                  <td style={tdStyle}>₹{parseFloat(inv.total_amount).toFixed(2)}</td>
-                </tr>
-
-                {expandedId === inv.id && (
-                  <tr><td colSpan={5} style={{ padding: 0 }}>
-                    {expandedLoading ? (
-                      <div style={{ padding: "20px", background: "#f9fafb", textAlign: "center" }}>Loading...</div>
-                    ) : expandedInvoice ? (
-                      <div style={{ padding: "20px 25px", background: "#fff", borderTop: "1px solid #e2e8f0", boxShadow: "inset 0 2px 4px rgba(0,0,0,0.03)" }}>
-                        {/* Action buttons */}
-                        <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
-                          <button onClick={(e) => { e.stopPropagation(); openEmailModal(expandedInvoice); }} style={smallSecondaryBtn}>✉️ Send Email</button>
-                          <button onClick={(e) => { e.stopPropagation(); setShowPaymentModal(true); }} style={{ ...smallSecondaryBtn, background: "#28a745", color: "#fff", border: "none" }}>💰 Record Payment</button>
-                          {expandedInvoice.status !== "paid" && (
-                            <button onClick={() => changeStatus(inv.id, "paid")} style={{ ...smallSecondaryBtn, background: "#d4edda", color: "#155724" }}>Mark Paid</button>
-                          )}
-                          {expandedInvoice.status !== "sent" && (
-                            <button onClick={() => changeStatus(inv.id, "sent")} style={smallSecondaryBtn}>Mark Sent</button>
-                          )}
-                          <button onClick={() => navigate(`/invoices/${inv.id}`)} style={{ ...smallSecondaryBtn, border: "1px solid #4a90e2", color: "#4a90e2" }}>Edit</button>
-                          <button onClick={() => navigate(`/invoices/${inv.id}/document`)} style={{ ...smallSecondaryBtn, border: "1px solid #28a745", color: "#28a745" }}>📄 Document</button>
-
-                          <div style={{ position: "relative" }}>
-                            <button onClick={(e) => { e.stopPropagation(); setMenuOpenFor(menuOpenFor === inv.id ? null : inv.id); }} style={smallSecondaryBtn}>⋯</button>
-                            {menuOpenFor === inv.id && (
-                              <div style={dropdownMenuStyle}>
-                                <button style={menuItemStyle} onClick={() => { setMenuOpenFor(null); changeStatus(inv.id, "cancelled"); }}>❌ Cancel</button>
-                                <button style={menuItemStyle} onClick={() => { setMenuOpenFor(null); handleDelete(inv.id); }}>🗑️ Delete</button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Invoice details */}
-                        <div style={{ display: "flex", gap: "30px", marginBottom: "15px", fontSize: "14px" }}>
-                          <div><strong>Customer:</strong> {getCustomerName(expandedInvoice.customer_id)}</div>
-                          <div><strong>Date:</strong> {new Date(expandedInvoice.invoice_date).toLocaleDateString()}</div>
-                          <div><strong>Due:</strong> {expandedInvoice.due_date ? new Date(expandedInvoice.due_date).toLocaleDateString() : "—"}</div>
-                          <div><strong>Balance Due:</strong> <span style={{ color: parseFloat(expandedInvoice.balance_due) <= 0 ? "green" : "red" }}>₹{parseFloat(expandedInvoice.balance_due || 0).toFixed(2)}</span></div>
-                        </div>
-
-                        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: "15px", fontSize: "14px" }}>
-                          <thead><tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-                            <th style={thStyle}>Item</th><th style={thStyle}>Qty</th><th style={thStyle}>Rate</th><th style={thStyle}>Amount</th>
-                          </tr></thead>
-                          <tbody>
-                            {expandedItems.length > 0 ? expandedItems.map((item, idx) => (
-                              <tr key={idx} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                                <td style={tdStyle}>{item.item_name || item.description}</td>
-                                <td style={tdStyle}>{item.quantity}</td>
-                                <td style={tdStyle}>{item.unit_price}</td>
-                                <td style={tdStyle}>₹{((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_price) || 0)).toFixed(2)}</td>
-                              </tr>
-                            )) : <tr><td colSpan={4} style={tdStyle}>No items</td></tr>}
-                          </tbody>
-                        </table>
-
-                        <div style={{ marginBottom: "15px", fontSize: "14px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
-                            <span>Total</span><span>₹{parseFloat(expandedInvoice.total_amount).toFixed(2)}</span>
-                          </div>
-                        </div>
-                        {expandedInvoice.notes && <div style={{ marginBottom: "10px", fontSize: "14px" }}><strong>Notes:</strong> {expandedInvoice.notes}</div>}
-                        {expandedInvoice.terms && <div style={{ fontSize: "14px" }}><strong>Terms:</strong> {expandedInvoice.terms}</div>}
+              {/* List of views */}
+              <div style={{ maxHeight: "250px", overflowY: "auto", padding: "8px 0" }}>
+                <div style={{ padding: "4px 16px", fontSize: "11px", fontWeight: "600", color: "#98a2b3", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>
+                  Default Views
+                </div>
+                {filteredViews.length > 0 ? filteredViews.map(view => (
+                  <div 
+                    key={view.key}
+                    onClick={() => { setStatusFilter(view.key); setStatusDropdownOpen(false); }}
+                    onMouseEnter={() => setHoveredItem(view.key)}
+                    onMouseLeave={() => setHoveredItem(null)}
+                    style={{
+                      padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer",
+                      background: statusFilter === view.key ? "#f9fafb" : (hoveredItem === view.key ? "#f9fafb" : "transparent"),
+                      display: "flex", justifyContent: "space-between", alignItems: "center"
+                    }}
+                  >
+                    <span>{view.label}</span>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      {statusFilter === view.key && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ba5ec" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      )}
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newFav = favoriteView === view.key ? null : view.key;
+                          setFavoriteView(newFav);
+                          if(newFav) localStorage.setItem("favInvoiceView", newFav);
+                          else localStorage.removeItem("favInvoiceView");
+                        }}
+                        style={{ color: favoriteView === view.key ? "#f59e0b" : "#d0d5dd" }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill={favoriteView === view.key ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                        </svg>
                       </div>
-                    ) : <div style={{ padding: "20px", background: "#f9fafb", textAlign: "center" }}>Failed to load details.</div>}
-                  </td></tr>
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ padding: "8px 16px", fontSize: "13px", color: "#667085" }}>No views found</div>
                 )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      )}
+              </div>
+            </div>
+          )}
+        </div>
 
-      {/* Send Email Modal */}
-      {showEmailModal && expandedInvoice && (
-        <div style={modalOverlay}><div style={modalBox}>
-          <h3 style={{ marginTop: 0 }}>Send Invoice via Email</h3>
-          <div style={{ marginBottom: "15px" }}><label><strong>To:</strong></label>
-            <input type="email" value={getCustomerById(expandedInvoice.customer_id).email || ""} readOnly style={{ ...inputStyle, background: "#f9f9f9" }} /></div>
-          <div style={{ marginBottom: "15px" }}><label><strong>Subject:</strong></label>
-            <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} style={inputStyle} /></div>
-          <div style={{ marginBottom: "20px" }}><label><strong>Message:</strong></label>
-            <textarea value={emailBody} onChange={e => setEmailBody(e.target.value)} rows={6} style={inputStyle} /></div>
-          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-            <button onClick={() => setShowEmailModal(false)} style={cancelBtnStyle}>Cancel</button>
-            <button onClick={sendEmailAndMarkSent} style={primaryBtn}>Send & Mark as Sent</button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button 
+            onClick={() => navigate("/invoices/new")} 
+            style={{ background: "#0ba5ec", color: "#fff", border: "none", borderRadius: "6px", padding: "8px 14px", fontSize: "14px", fontWeight: "500", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New
+          </button>
+          
+          {/* More actions dropdown */}
+          <div style={{ position: "relative" }}>
+            <button 
+              onClick={() => setMoreMenuOpen(!moreMenuOpen)}
+              style={{ background: "#f9fafb", border: "1px solid #eaecf0", borderRadius: "6px", padding: "8px", cursor: "pointer", display: "flex", alignItems: "center", color: "#344054" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+            </button>
+            {moreMenuOpen && (
+              <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "8px", background: "#fff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 10px 30px rgba(16, 24, 40, 0.08)", zIndex: 1000, width: "220px", padding: "8px 0" }}>
+                
+                {/* Sort Submenu */}
+                <div 
+                  onMouseEnter={() => setSortSubMenuOpen(true)}
+                  onMouseLeave={() => setSortSubMenuOpen(false)}
+                  style={{ position: "relative" }}
+                >
+                  <div style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6l3 -3l3 3"></path><path d="M6 3v18"></path><path d="M15 18l3 3l3 -3"></path><path d="M18 21v-18"></path></svg>
+                      Sort by
+                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </div>
+                  
+                  {sortSubMenuOpen && (
+                    <div style={{ position: "absolute", right: "100%", top: 0, marginRight: "4px", background: "#fff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", width: "180px", padding: "8px 0" }}>
+                      {[
+                        { key: "invoice_date", label: "Date" },
+                        { key: "invoice_number", label: "Invoice Number" },
+                        { key: "customer_name", label: "Customer Name" },
+                        { key: "total", label: "Amount" }
+                      ].map(opt => (
+                        <div key={opt.key} onClick={() => { setSortBy(opt.key); setSortOrder(sortBy === opt.key && sortOrder === "asc" ? "desc" : "asc"); setMoreMenuOpen(false); setSortSubMenuOpen(false); }} style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer", display: "flex", justifyContent: "space-between" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>
+                          {opt.label}
+                          {sortBy === opt.key && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0ba5ec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points={sortOrder === "asc" ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}></polyline></svg>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Export Submenu */}
+                <div 
+                  onMouseEnter={() => setExportSubMenuOpen(true)}
+                  onMouseLeave={() => setExportSubMenuOpen(false)}
+                  style={{ position: "relative" }}
+                >
+                  <div style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      Export
+                    </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#98a2b3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </div>
+                  
+                  {exportSubMenuOpen && (
+                    <div style={{ position: "absolute", right: "100%", top: 0, marginRight: "4px", background: "#fff", border: "1px solid #eaecf0", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.1)", width: "150px", padding: "8px 0" }}>
+                      <div onClick={() => { handleExportCSV(); setMoreMenuOpen(false); setExportSubMenuOpen(false); }} style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>Export as CSV</div>
+                      <div onClick={() => { handleExportJSON(); setMoreMenuOpen(false); setExportSubMenuOpen(false); }} style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>Export as JSON</div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ height: "1px", background: "#eaecf0", margin: "4px 0" }}></div>
+                <div onClick={() => { fetchData(); setMoreMenuOpen(false); }} style={{ padding: "8px 16px", fontSize: "14px", color: "#344054", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }} onMouseEnter={(e) => e.currentTarget.style.background="#f9fafb"} onMouseLeave={(e) => e.currentTarget.style.background="transparent"}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#667085" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  Refresh List
+                </div>
+              </div>
+            )}
           </div>
-        </div></div>
-      )}
+        </div>
+      </div>
 
-      {/* Record Payment Modal */}
-      {showPaymentModal && expandedInvoice && (
-        <div style={modalOverlay}><div style={{ ...modalBox, width: "450px" }}>
-          <h3 style={{ marginTop: 0 }}>Record Payment</h3>
-          <div style={{ marginBottom: "15px" }}><label>Amount *</label>
-            <input type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} style={inputStyle} /></div>
-          <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
-            <div style={{ flex: 1 }}><label>Date</label><input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} style={inputStyle} /></div>
-            <div style={{ flex: 1 }}><label>Mode</label>
-              <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)} style={inputStyle}>
-                <option value="cash">Cash</option><option value="bank_transfer">Bank Transfer</option>
-                <option value="upi">UPI</option><option value="cheque">Cheque</option>
-              </select>
+      {/* Main Content Area */}
+      <div style={{ padding: "0" }}>
+        
+        {/* Table View */}
+        {loading ? (
+          <div style={{ padding: "24px" }}><TableSkeleton columns={7} rows={6} /></div>
+        ) : invoices.length === 0 ? (
+          // EMPTY STATE
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 20px", textAlign: "center" }}>
+            <div style={{ background: "#f8fafc", padding: "20px", borderRadius: "16px", marginBottom: "30px", border: "1px dashed #cbd5e1", maxWidth: "450px" }}>
+              <div style={{ fontSize: "40px", marginBottom: "15px" }}>🧾</div>
+              <h3 style={{ fontSize: "18px", color: "#0f172a", margin: "0 0 10px 0" }}>Start billing your customers!</h3>
+              <p style={{ fontSize: "14px", color: "#64748b", margin: "0 0 20px 0", lineHeight: "1.5" }}>
+                Create professional invoices, send them to your customers, and get paid faster.
+              </p>
+              <button 
+                onClick={() => navigate("/invoices/new")} 
+                style={{ background: "#0ba5ec", color: "#fff", border: "none", borderRadius: "6px", padding: "10px 20px", fontSize: "14px", fontWeight: "600", cursor: "pointer", display: "inline-block" }}
+              >
+                CREATE INVOICE
+              </button>
+            </div>
+
+            {/* Lifecycle Flowchart */}
+            <div style={{ maxWidth: "800px", margin: "0 auto" }}>
+              <p style={{ fontSize: "12px", fontWeight: "600", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "20px" }}>Life cycle of an Invoice</p>
+              
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div style={{ padding: "12px 16px", background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "13px", color: "#334155", fontWeight: "500" }}>Create Invoice</div>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                
+                <div style={{ padding: "12px 16px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: "8px", fontSize: "13px", color: "#0369a1", fontWeight: "500" }}>Send to Customer</div>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                
+                <div style={{ padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px", fontSize: "13px", color: "#15803d", fontWeight: "500" }}>Get Paid</div>
+              </div>
             </div>
           </div>
-          <div style={{ marginBottom: "15px" }}><label>Reference</label>
-            <input type="text" value={paymentReference} onChange={e => setPaymentReference(e.target.value)} style={inputStyle} placeholder="Transaction ID / Cheque #" /></div>
-          <div style={{ marginBottom: "20px" }}><label>Notes</label>
-            <textarea value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} rows={2} style={inputStyle} /></div>
-          <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-            <button onClick={() => setShowPaymentModal(false)} style={cancelBtnStyle}>Cancel</button>
-            <button onClick={handleRecordPayment} style={primaryBtn}>Record Payment</button>
+        ) : (
+          <div>
+            {/* Bulk Actions Bar */}
+            <div style={{ padding: "12px 24px", background: selectedIds.length > 0 ? "#f9fafb" : "#fff", borderBottom: "1px solid #eaecf0", display: "flex", justifyContent: "space-between", alignItems: "center", minHeight: "60px", transition: "background 0.2s" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                <div style={{ position: "relative", width: "240px" }}>
+                  <span style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#98a2b3", display: "flex" }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Search invoices..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ width: "100%", padding: "8px 12px 8px 36px", borderRadius: "6px", border: "1px solid #d0d5dd", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                  />
+                </div>
+              </div>
+              
+              {selectedIds.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <span style={{ fontSize: "14px", color: "#475569", fontWeight: "500" }}>{selectedIds.length} selected</span>
+                  <button onClick={handleDeleteSelected} style={{ background: "#fff", border: "1px solid #d0d5dd", borderRadius: "6px", padding: "6px 12px", color: "#b91c1c", fontSize: "13px", fontWeight: "600", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Data Table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "900px" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #eaecf0", background: "#f9fafb" }}>
+                    <th style={{ padding: "12px 24px", width: "40px", textAlign: "left" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={sortedInvoices.length > 0 && selectedIds.length === sortedInvoices.length}
+                        onChange={handleSelectAll}
+                        style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#0ba5ec" }}
+                      />
+                    </th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Date</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Invoice #</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Customer Name</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Status</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Due Date</th>
+                    <th style={{ padding: "12px 24px", textAlign: "right", fontSize: "12px", fontWeight: "600", color: "#667085", textTransform: "uppercase", letterSpacing: "0.05em" }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedInvoices.length > 0 ? sortedInvoices.map(inv => (
+                    <tr 
+                      key={inv.id} 
+                      onClick={() => navigate(`/invoices/${inv.id}/document`)}
+                      style={{ borderBottom: "1px solid #eaecf0", cursor: "pointer", transition: "background 0.15s" }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = "#f9fafb"}
+                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                    >
+                      <td style={{ padding: "16px 24px" }} onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedIds.includes(inv.id)}
+                          onChange={(e) => handleSelectOne(e, inv.id)}
+                          style={{ width: "16px", height: "16px", cursor: "pointer", accentColor: "#0ba5ec" }}
+                        />
+                      </td>
+                      <td style={{ padding: "16px 16px", fontSize: "14px", color: "#475569" }}>
+                        {new Date(inv.invoice_date).toLocaleDateString("en-GB", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </td>
+                      <td style={{ padding: "16px 16px", fontSize: "14px", fontWeight: "500", color: "#0ba5ec" }}>
+                        {inv.invoice_number}
+                      </td>
+                      <td style={{ padding: "16px 16px", fontSize: "14px", color: "#1d2939", fontWeight: "500" }}>
+                        {getCustomerName(inv.customer_id)}
+                      </td>
+                      <td style={{ padding: "16px 16px" }}>
+                        {statusBadge(inv.status)}
+                      </td>
+                      <td style={{ padding: "16px 16px", fontSize: "14px", color: "#475569" }}>
+                        {inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-GB", { day: '2-digit', month: '2-digit', year: 'numeric' }) : "—"}
+                      </td>
+                      <td style={{ padding: "16px 24px", textAlign: "right", fontSize: "14px", fontWeight: "600", color: "#1d2939" }}>
+                        ₹{parseFloat(inv.total_amount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#64748b", fontSize: "14px" }}>
+                        No invoices found matching your criteria.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div></div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
-
-const thStyle = { padding: "10px", borderBottom: "2px solid #cbd5e1", whiteSpace: "nowrap" };
-const tdStyle = { padding: "10px" };
-const inputStyle = { width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", boxSizing: "border-box" };
-const primaryBtn = { padding: "10px 20px", background: "#4a90e2", color: "#fff", border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: "500" };
-const smallSecondaryBtn = { padding: "6px 12px", background: "#f0f0f0", color: "#333", border: "1px solid #ccc", borderRadius: "5px", cursor: "pointer", fontSize: "13px" };
-const cancelBtnStyle = { padding: "10px 20px", background: "#ccc", color: "#333", border: "none", borderRadius: "5px", cursor: "pointer" };
-const dropdownMenuStyle = { position: "absolute", right: 0, top: "100%", background: "#fff", borderRadius: "6px", boxShadow: "0 4px 12px rgba(0,0,0,0.15)", zIndex: 10, minWidth: "140px" };
-const menuItemStyle = { display: "block", width: "100%", padding: "8px 16px", border: "none", background: "none", textAlign: "left", cursor: "pointer", whiteSpace: "nowrap" };
-const modalOverlay = { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000 };
-const modalBox = { background: "#fff", borderRadius: "8px", padding: "25px", width: "600px", maxWidth: "90%", maxHeight: "80vh", overflow: "auto", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" };
 
 export default Invoices;

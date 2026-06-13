@@ -93,6 +93,7 @@ function Login() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const navigate = useNavigate();
   const { user, loading, setUser } = useAuth();
@@ -105,15 +106,23 @@ function Login() {
     e.preventDefault();
     setMessage("");
 
-    if (!email || !password) {
-      setMessage("Please enter email and password");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setMessage("Please enter both email and password");
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setMessage("Please enter a valid email address format");
+      return;
+    }
+
+    setIsLoggingIn(true);
     try {
       const data = await apiRequest("/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: trimmedEmail, password }),
       });
 
       if (data && data.user) {
@@ -124,6 +133,8 @@ function Login() {
       }
     } catch (err) {
       setMessage(err.message || "Network error");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -133,9 +144,8 @@ function Login() {
         <div className="auth-overlay"></div>
 
         <div className="auth-left-content">
-          <div className="auth-brand-badge">
-            <span className="auth-book-icon"></span>
-            <span>RUPP Books</span>
+          <div className="auth-brand-badge" style={{ padding: 0, background: "transparent", boxShadow: "none" }}>
+            <img src="/logo.png" alt="Logo" style={{ height: "90px", maxWidth: "100%", objectFit: "contain" }} />
           </div>
 
           <h1 className="auth-hero-title">Accounting Made Simple</h1>
@@ -202,8 +212,8 @@ function Login() {
 
             {message && <p className="auth-error">{message}</p>}
 
-            <button type="submit" className="auth-submit-btn">
-              Sign In
+            <button type="submit" className="auth-submit-btn" disabled={isLoggingIn}>
+              {isLoggingIn ? "Signing In..." : "Sign In"}
             </button>
           </form>
 

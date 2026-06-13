@@ -7,47 +7,61 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import "./Sidebar.css";
 
+import { 
+  Home, Package, ShoppingCart, Receipt, 
+  Clock, Landmark, Calculator, BarChart2, FolderOpen 
+} from "lucide-react";
+import { useAuth } from "../AuthContext";
+import { canAccess, MODULES, ACTIONS } from "../utils/permissions";
+
 /* ── Sidebar menu definition ── */
 const sidebarMenus = [
-  { label: "Home", icon: "⌂", path: "/dashboard" },
+  { label: "Home", icon: <Home size={18} />, path: "/dashboard" },
   {
-    label: "Items", icon: "▣",
+    label: "Items", icon: <Package size={18} />, module: MODULES.ITEMS,
     children: [
       { label: "Items", path: "/items" },
+      { label: "New Item", path: "/items/new" },
+      { label: "Stock In / Stock Out", path: "/inventory/stock" },
+      { label: "Inventory Movements", path: "/inventory/movements" },
+      { label: "Low Stock Alerts", path: "/inventory/low-stock" },
+      { label: "Item Valuation Report", path: "/reports/item-valuation" },
     ],
   },
   {
-    label: "Sales", icon: "🛒",
+    label: "Sales", icon: <ShoppingCart size={18} />,
     children: [
-      { label: "Customers", path: "/customers" },
-      { label: "Quotes", path: "/quotes" },
-      { label: "Invoices", path: "/invoices" },
-      { label: "Sales Orders", path: "/sales-orders" },
+      { label: "Customers", path: "/customers", module: MODULES.CUSTOMERS },
+      { label: "Quotes", path: "/quotes", module: MODULES.QUOTES },
+      { label: "Invoices", path: "/invoices", module: MODULES.INVOICES },
+      { label: "Sales Orders", path: "/sales-orders" }, // Allow if they have sales access
       { label: "Payments Received", path: "/payments-received" },
       { label: "Delivery Challans", path: "/delivery-challans" },
+      { label: "Credit Notes", path: "/credit-notes" },
       { label: "Recurring Invoices", path: "/recurring-invoices" },
     ],
   },
   {
-    label: "Purchases", icon: "🧾",
+    label: "Purchases", icon: <Receipt size={18} />,
     children: [
-      { label: "Vendors", path: "/vendors" },
-      { label: "Expenses", path: "/expenses" },
+      { label: "Vendors", path: "/vendors", module: MODULES.VENDORS },
+      { label: "Expenses", path: "/expenses", module: MODULES.EXPENSES },
+      { label: "Recurring / Fixed Expenses", path: "/recurring-expenses" },
       { label: "Purchase Orders", path: "/purchase-orders" },
-      { label: "Bills", path: "/bills" },
+      { label: "Bills", path: "/bills", module: MODULES.BILLS },
       { label: "Payments Made", path: "/payments-made" },
       { label: "Vendor Credits", path: "/vendor-credits" },
     ],
   },
   {
-    label: "Time Tracking", icon: "⏱",
+    label: "Time Tracking", icon: <Clock size={18} />,
     children: [
       { label: "Projects", path: "/projects" },
-      { label: "Timesheet", path: "/timesheet" },
+      { label: "Timesheets", path: "/timesheets" },
     ],
   },
   {
-    label: "Banking", icon: "🏦",
+    label: "Banking", icon: <Landmark size={18} />, module: MODULES.BANKING,
     children: [
       { label: "Bank Accounts", path: "/bank-accounts" },
       { label: "Bank Rules", path: "/bank-rules" },
@@ -55,16 +69,18 @@ const sidebarMenus = [
     ],
   },
   {
-    label: "Accountant", icon: "♟",
+    label: "Accountant", icon: <Calculator size={18} />, module: MODULES.REPORTS, // Treat accountant tools like reports access for visibility
     children: [
       { label: "Chart of Accounts", path: "/chart-of-accounts" },
       { label: "Manual Journals", path: "/manual-journals" },
+      { label: "Transaction Locking", path: "/transaction-locking" },
+      { label: "Bulk Updates", path: "/bulk-updates" },
       { label: "Currency Adjustments", path: "/currency-adjustments" },
       { label: "Taxes", path: "/taxes" },
     ],
   },
   {
-    label: "Reports", icon: "▥",
+    label: "Reports", icon: <BarChart2 size={18} />, module: MODULES.REPORTS,
     children: [
       { label: "Profit and Loss", path: "/reports/profit-loss" },
       { label: "Balance Sheet", path: "/reports/balance-sheet" },
@@ -73,7 +89,7 @@ const sidebarMenus = [
     ],
   },
   {
-    label: "Documents", icon: "📁",
+    label: "Documents", icon: <FolderOpen size={18} />,
     children: [
       { label: "All Documents", path: "/documents" },
       { label: "Upload Document", path: "/documents/upload" },
@@ -84,6 +100,7 @@ const sidebarMenus = [
 function Sidebar({ onCollapseChange }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -160,16 +177,19 @@ function Sidebar({ onCollapseChange }) {
 
       <aside className={sidebarClass}>
         {/* Brand */}
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">B</div>
-          {showLabels && <span className="sidebar-brand-text">RUPP Books</span>}
+        <div className="sidebar-brand" style={{ padding: "10px", display: "flex", justifyContent: "center" }}>
+          {showLabels ? (
+            <img src="/logo.png" alt="Logo" style={{ height: "40px", maxWidth: "100%", objectFit: "contain" }} />
+          ) : (
+            <img src="/logo.png" alt="Logo" style={{ height: "30px", width: "30px", objectFit: "cover", objectPosition: "left" }} />
+          )}
         </div>
 
         {/* Desktop collapse button */}
         {!isMobile && (
           <button
             className="sidebar-collapse-btn"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => handleCollapse(!collapsed)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? "›" : "‹"}
@@ -178,12 +198,32 @@ function Sidebar({ onCollapseChange }) {
 
         {/* Navigation */}
         <nav className="sidebar-nav">
-          {sidebarMenus.map((menu) => (
+          {sidebarMenus.map((menu) => {
+            // Check top-level permission
+            if (menu.module && !canAccess(user?.role, menu.module, ACTIONS.VIEW)) return null;
+
+            // Filter children
+            const allowedChildren = menu.children ? menu.children.filter(child => {
+              if (child.module) return canAccess(user?.role, child.module, ACTIONS.VIEW);
+              // For sales/purchases sub-items without explicit modules mapped,
+              // we hide them if they are Staff (for unsupported ones) or Viewer. 
+              // To keep it simple, if no module is mapped on the child, we allow it to render,
+              // but the actual route will be blocked by ProtectedRoute or backend.
+              // We'll hide Sales Orders, etc for Staff by mapping them, but let's just use a simple approach for now.
+              return true; 
+            }) : [];
+
+            if (menu.children && allowedChildren.length === 0) return null;
+
+            // Specific hide logic for Staff on Accounting
+            if (menu.label === "Accountant" && user?.role?.toLowerCase() === "staff") return null;
+
+            return (
             <div key={menu.label} className="sidebar-menu-block">
               <button
                 className={`sidebar-menu-btn ${isActive(menu) ? "active" : ""}`}
                 onClick={() =>
-                  menu.children
+                  allowedChildren.length > 0
                     ? toggleDropdown(menu.label)
                     : navigate(menu.path)
                 }
@@ -193,7 +233,7 @@ function Sidebar({ onCollapseChange }) {
                 {showLabels && (
                   <>
                     <span className="sidebar-menu-text">{menu.label}</span>
-                    {menu.children && (
+                    {allowedChildren.length > 0 && (
                       <span className={`sidebar-arrow ${openDropdown === menu.label ? "open" : ""}`}>
                         ›
                       </span>
@@ -203,9 +243,9 @@ function Sidebar({ onCollapseChange }) {
               </button>
 
               {/* Dropdown submenu */}
-              {showLabels && menu.children && openDropdown === menu.label && (
+              {showLabels && allowedChildren.length > 0 && openDropdown === menu.label && (
                 <div className="sidebar-submenu">
-                  {menu.children.map((child) => (
+                  {allowedChildren.map((child) => (
                     <button
                       key={child.label}
                       className={`sidebar-submenu-btn ${location.pathname.startsWith(child.path) ? "active" : ""}`}
@@ -217,7 +257,8 @@ function Sidebar({ onCollapseChange }) {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Sidebar footer */}

@@ -1,7 +1,8 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
+import { canAccess, ACTIONS } from "./utils/permissions";
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, module, action = ACTIONS.VIEW }) => {
   const { user, loading } = useAuth();
 
   // ✅ Wait until auth check finishes
@@ -16,6 +17,11 @@ const ProtectedRoute = ({ children }) => {
   // ✅ Only redirect AFTER loading is done
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // ✅ Check module permission if specified
+  if (module && !canAccess(user.role, module, action)) {
+    return <Navigate to="/access-denied" replace />;
   }
 
   return children;

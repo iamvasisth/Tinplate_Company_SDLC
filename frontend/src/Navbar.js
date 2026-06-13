@@ -11,6 +11,7 @@ function Navbar() {
   const { user, setUser } = useAuth();
 
   // Dropdown states
+  const [itemsOpen, setItemsOpen] = useState(false);
   const [salesOpen, setSalesOpen] = useState(false);
   const [purchasesOpen, setPurchasesOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
@@ -99,12 +100,23 @@ function Navbar() {
           Home
         </div>
 
-        {/* Items (dynamic) */}
+        {/* Items (dynamic) dropdown */}
         <div
-          style={{ padding: "10px 15px", cursor: "pointer", fontWeight: "500" }}
-          onClick={() => navigate("/items")}  // will be built later
+          style={menuItemStyle}
+          onMouseEnter={() => setItemsOpen(true)}
+          onMouseLeave={() => setItemsOpen(false)}
         >
           {itemLabel}
+          {itemsOpen && (
+            <div style={dropdownStyle}>
+              <div style={dropdownItemStyle} onClick={() => navigate("/items")}>Items</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/items/new")}>New Item</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/inventory/stock")}>Stock In / Stock Out</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/inventory/movements")}>Inventory Movements</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/inventory/low-stock")}>Low Stock Alerts</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/reports/item-valuation")}>Item Valuation Report</div>
+            </div>
+          )}
         </div>
 
         {/* Sales dropdown */}
@@ -139,6 +151,7 @@ function Navbar() {
             <div style={dropdownStyle}>
               <div style={dropdownItemStyle} onClick={() => navigate("/vendors")}>Vendors</div>
               <div style={dropdownItemStyle} onClick={() => navigate("/expenses")}>Expenses</div>
+              <div style={dropdownItemStyle} onClick={() => navigate("/recurring-expenses")}>Recurring / Fixed Expenses</div>
               <div style={dropdownItemStyle} onClick={() => navigate("/purchase-orders")}>Purchase Orders</div>
               <div style={dropdownItemStyle} onClick={() => navigate("/bills")}>Bills</div>
               <div style={dropdownItemStyle} onClick={() => navigate("/payments-made")}>Payments Made</div>
@@ -162,12 +175,12 @@ function Navbar() {
           )}
         </div>
 
-        {/* Banking */}
+        {/* Projected Payment */}
         <div
           style={{ padding: "10px 15px", cursor: "pointer", fontWeight: "500" }}
-          onClick={() => navigate("/banking")}
+          onClick={() => navigate("/projected-payments")}
         >
-          Banking
+          Projected Payment
         </div>
 
         {/* Accountant dropdown */}

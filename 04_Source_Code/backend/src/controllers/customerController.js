@@ -1,12 +1,24 @@
+/**
+ * customerController.js – Full CRUD with addresses & contact persons
+ * Dependencies: pool
+ */
 const pool = require("../config/db");
 
-// ================= GET ALL CUSTOMERS =================
+// ================= GET ALL CUSTOMERS (with optional status filter) =================
 const getCustomers = async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT * FROM customers WHERE user_id = $1 ORDER BY id DESC",
-      [req.user.id]
-    );
+    const { status } = req.query;
+    let query = `SELECT * FROM customers WHERE user_id = $1`;
+    const values = [req.user.id];
+
+    if (status === "active") {
+      query += " AND is_active = true";
+    } else if (status === "inactive") {
+      query += " AND is_active = false";
+    }
+
+    query += " ORDER BY created_at DESC";
+    const result = await pool.query(query, values);
     res.json({ customers: result.rows });
   } catch (err) {
     console.error("GET CUSTOMERS ERROR:", err);
@@ -14,20 +26,34 @@ const getCustomers = async (req, res) => {
   }
 };
 
-// ================= GET CUSTOMER BY ID =================
+// ================= GET SINGLE CUSTOMER (with addresses & contacts) =================
 const getCustomerById = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(
-      "SELECT * FROM customers WHERE id = $1 AND user_id = $2",
-      [id, req.user.id]
+    const customer = await pool.query(
+      `SELECT * FROM customers WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id],
     );
-    if (result.rows.length === 0)
+    if (customer.rows.length === 0) {
       return res.status(404).json({ message: "Customer not found" });
+    }
 
-    res.json({ customer: result.rows[0] });
+    const addresses = await pool.query(
+      `SELECT * FROM customer_addresses WHERE customer_id = $1`,
+      [id],
+    );
+    const contacts = await pool.query(
+      `SELECT * FROM customer_contacts WHERE customer_id = $1`,
+      [id],
+    );
+
+    res.json({
+      customer: customer.rows[0],
+      addresses: addresses.rows,
+      contacts: contacts.rows,
+    });
   } catch (err) {
-    console.error("GET CUSTOMER BY ID ERROR:", err);
+    console.error("GET CUSTOMER ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -35,51 +61,324 @@ const getCustomerById = async (req, res) => {
 // ================= CREATE CUSTOMER =================
 const createCustomer = async (req, res) => {
   const {
-    first_name, last_name, display_name,
-    email, phone, address, city, state, pincode
+    customer_type,
+    customer_sub_type,
+    salutation,
+    first_name,
+    last_name,
+    company_name,
+    display_name,
+    email,
+    phone,
+    work_phone,
+    mobile,
+    language,
+    contact_persons,
+    custom_fields,
+    reporting_tags,
+    remarks,
+    pan,
+    currency,
+    opening_balance,
+    payment_terms,
+    enable_portal,
+    portal_language,
+    documents,
+    customer_owner_id,
+    addresses,
+    contacts,
   } = req.body;
 
+  const contactPersonsArray = contacts || contact_persons || [];
+  const { addActivityLog } = require("./activityController");
+
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `INSERT INTO customers 
-        (user_id, first_name, last_name, display_name, email, phone, address, city, state, pincode)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+    await client.query("BEGIN");
+
+    const customerResult = await client.query(
+      `INSERT INTO customers
+        (user_id, customer_type, customer_sub_type, salutation, first_name, last_name,
+         company_name, display_name, email, phone, work_phone, mobile, language,
+         contact_persons, custom_fields, reporting_tags, remarks, pan,
+         currency, opening_balance, payment_terms, enable_portal, portal_language,
+         documents, customer_owner_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        RETURNING *`,
-      [req.user.id, first_name, last_name, display_name,
-       email, phone, address, city, state, pincode]
+      [
+        req.user.id,
+        customer_type || "Business",
+        customer_sub_type || null,
+        salutation || null,
+        first_name || null,
+        last_name || null,
+        company_name || null,
+        display_name || null,
+        email || null,
+        phone || null,
+        work_phone || null,
+        mobile || null,
+        language || null,
+        "[]",
+        custom_fields ? JSON.stringify(custom_fields) : "{}",
+        reporting_tags || null,
+        remarks || null,
+        pan || null,
+        currency || "INR",
+        opening_balance || 0,
+        payment_terms || null,
+        enable_portal || false,
+        portal_language || "en",
+        documents ? JSON.stringify(documents) : "[]",
+        customer_owner_id || null,
+      ],
     );
-    res.json({ message: "Customer created", customer: result.rows[0] });
+    const customerId = customerResult.rows[0].id;
+
+    if (Array.isArray(addresses)) {
+      for (const addr of addresses) {
+        await client.query(
+          `INSERT INTO customer_addresses
+           (customer_id, type, attention, country, address_line1, address_line2,
+            city, state, pin_code, phone, fax)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          [
+            customerId,
+            addr.type || "billing",
+            addr.attention || null,
+            addr.country || null,
+            addr.address_line1 || null,
+            addr.address_line2 || null,
+            addr.city || null,
+            addr.state || null,
+            addr.pin_code || null,
+            addr.phone || null,
+            addr.fax || null,
+          ],
+        );
+      }
+    }
+
+    if (Array.isArray(contactPersonsArray)) {
+      for (const person of contactPersonsArray) {
+        await client.query(
+          `INSERT INTO customer_contacts
+           (customer_id, salutation, first_name, last_name, email, work_phone, mobile)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [
+            customerId,
+            person.salutation || null,
+            person.first_name || null,
+            person.last_name || null,
+            person.email || null,
+            person.work_phone || null,
+            person.mobile || null,
+          ],
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    await logActivity(customerResult.rows[0].id, req.user.id, "created", "Contact created");
+    await addActivityLog(
+      customerId,
+      req.user.id,
+      req.user.email,
+      "created",
+      "Contact created",
+    );
+
+    res.json({ message: "Customer created", customer: customerResult.rows[0] });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("CREATE CUSTOMER ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  } finally {
+    client.release();
+  }
+};
+
+// ================== ACTIVITY LOGGING FUNCTION (can be used across controllers) =================
+const logActivity = async (customerId, userId, actionType, description) => {
+  try {
+    await pool.query(
+      `INSERT INTO customer_activity_log (customer_id, user_id, action_type, description)
+       VALUES ($1, $2, $3, $4)`,
+      [customerId, userId, actionType, description]
+    );
+  } catch (err) {
+    console.error("LOG ACTIVITY ERROR:", err);
   }
 };
 
 // ================= UPDATE CUSTOMER =================
+
 const updateCustomer = async (req, res) => {
   const { id } = req.params;
-  const {
-    first_name, last_name, display_name,
-    email, phone, address, city, state, pincode
-  } = req.body;
+  const updates = req.body; // all fields sent by the frontend
+  const { addActivityLog } = require("./activityController");
 
+  // Remove fields that should never be mass-updated directly (if any)
+  delete updates.id;
+  delete updates.user_id;
+  delete updates.created_at;
+  delete updates.updated_at;
+
+  // Separate addresses / contacts / contact_persons if present
+  const { addresses, contacts, contact_persons, ...customerFields } = updates;
+  const contactPersonsArray = contacts || contact_persons || null;
+
+  // Build SET clause dynamically from the provided customer fields
+  const setColumns = [];
+  const values = [];
+  let paramIndex = 1;
+
+  for (const [key, value] of Object.entries(customerFields)) {
+    // Convert camelCase (frontend) to snake_case (DB column) if needed
+    // All your frontend keys already match the column names (e.g., is_active, first_name)
+    if (value !== undefined) {
+      setColumns.push(`${key} = $${paramIndex}`);
+      values.push(value);
+      paramIndex++;
+    }
+  }
+
+  if (setColumns.length === 0 && !addresses && !contactPersonsArray) {
+    return res.status(400).json({ message: "No fields to update" });
+  }
+
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE customers 
-       SET first_name=$1, last_name=$2, display_name=$3,
-           email=$4, phone=$5, address=$6, city=$7, state=$8, pincode=$9
-       WHERE id=$10 AND user_id=$11
-       RETURNING *`,
-      [first_name, last_name, display_name,
-       email, phone, address, city, state, pincode, id, req.user.id]
-    );
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "Customer not found" });
+    await client.query("BEGIN");
 
-    res.json({ message: "Customer updated", customer: result.rows[0] });
+    // --- Update customer record (only if we have column updates) ---
+    let customerResult;
+    if (setColumns.length > 0) {
+      // Add updated_at automatically
+      setColumns.push(`updated_at = CURRENT_TIMESTAMP`);
+
+      const query = `
+        UPDATE customers
+        SET ${setColumns.join(", ")}
+        WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+        RETURNING *
+      `;
+      values.push(id, req.user.id);
+      customerResult = await client.query(query, values);
+      if (customerResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Customer not found" });
+      }
+    } else {
+      // No fields to update in customers table, just fetch current data
+      customerResult = await client.query(
+        `SELECT * FROM customers WHERE id = $1 AND user_id = $2`,
+        [id, req.user.id],
+      );
+      if (customerResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Customer not found" });
+      }
+    }
+
+    // --- Update addresses (replace all if provided) ---
+    if (addresses !== undefined) {
+      await client.query(
+        `DELETE FROM customer_addresses WHERE customer_id = $1`,
+        [id],
+      );
+      if (Array.isArray(addresses)) {
+        for (const addr of addresses) {
+          await client.query(
+            `INSERT INTO customer_addresses
+             (customer_id, type, attention, country, address_line1, address_line2,
+              city, state, pin_code, phone, fax)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            [
+              id,
+              addr.type || "billing",
+              addr.attention || null,
+              addr.country || null,
+              addr.address_line1 || null,
+              addr.address_line2 || null,
+              addr.city || null,
+              addr.state || null,
+              addr.pin_code || null,
+              addr.phone || null,
+              addr.fax || null,
+            ],
+          );
+        }
+      }
+    }
+
+    // --- Update contacts (replace all if provided) ---
+    if (contactPersonsArray !== undefined) {
+      await client.query(
+        `DELETE FROM customer_contacts WHERE customer_id = $1`,
+        [id],
+      );
+      if (Array.isArray(contactPersonsArray)) {
+        for (const person of contactPersonsArray) {
+          await client.query(
+            `INSERT INTO customer_contacts
+             (customer_id, salutation, first_name, last_name, email, work_phone, mobile)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            [
+              id,
+              person.salutation || null,
+              person.first_name || null,
+              person.last_name || null,
+              person.email || null,
+              person.work_phone || null,
+              person.mobile || null,
+            ],
+          );
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+    if (customerFields.hasOwnProperty("is_active")) {
+  await logActivity(
+    customerResult.rows[0].id,
+    req.user.id,
+    "status_changed",
+    `Marked as ${customerFields.is_active ? "active" : "inactive"}`
+  );
+} else {
+  await logActivity(
+    customerResult.rows[0].id,
+    req.user.id,
+    "updated",
+    "Contact updated"
+  );
+}
+    if (is_active !== undefined) {
+      const statusText = is_active ? "Marked as active" : "Marked as inactive";
+      await addActivityLog(
+        id,
+        req.user.id,
+        req.user.email,
+        "status_changed",
+        statusText,
+      );
+    } else {
+      await addActivityLog(
+        id,
+        req.user.id,
+        req.user.email,
+        "updated",
+        "Contact updated",
+      );
+    }
+    res.json({ message: "Customer updated", customer: customerResult.rows[0] });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("UPDATE CUSTOMER ERROR:", err);
     res.status(500).json({ message: "Server error" });
+  } finally {
+    client.release();
   }
 };
 
@@ -87,10 +386,13 @@ const updateCustomer = async (req, res) => {
 const deleteCustomer = async (req, res) => {
   const { id } = req.params;
   try {
-    await pool.query(
-      "DELETE FROM customers WHERE id = $1 AND user_id = $2",
-      [id, req.user.id]
+    const result = await pool.query(
+      `DELETE FROM customers WHERE id = $1 AND user_id = $2 RETURNING *`,
+      [id, req.user.id],
     );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
     res.json({ message: "Customer deleted" });
   } catch (err) {
     console.error("DELETE CUSTOMER ERROR:", err);
@@ -98,19 +400,71 @@ const deleteCustomer = async (req, res) => {
   }
 };
 
-// ================= GET ACTIVITY LOG =================
 const getActivityLog = async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT * FROM activity_log 
-       WHERE customer_id = $1 AND user_id = $2 
-       ORDER BY created_at DESC`,
+      `SELECT cal.*, u.email as user_email
+       FROM customer_activity_log cal
+       LEFT JOIN users u ON cal.user_id = u.id
+       WHERE cal.customer_id = $1
+       ORDER BY cal.created_at DESC
+       LIMIT 20`,
+      [id]
+    );
+    res.json({ activities: result.rows });
+  } catch (err) {
+    console.error("GET ACTIVITY ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getCustomerStatement = async (req, res) => {
+  const { id } = req.params;
+  const { start_date, end_date } = req.query;
+  try {
+    const custRes = await pool.query(
+      "SELECT * FROM customers WHERE id = $1 AND user_id = $2",
       [id, req.user.id]
     );
-    res.json({ activity: result.rows });
+    if (custRes.rows.length === 0) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+    const customer = custRes.rows[0];
+
+    let invoiceQuery = `SELECT * FROM invoices WHERE customer_id = $1 AND user_id = $2`;
+    const params = [id, req.user.id];
+    if (start_date && end_date) {
+      invoiceQuery += ` AND invoice_date BETWEEN $3 AND $4`;
+      params.push(start_date, end_date);
+    }
+    invoiceQuery += ` ORDER BY invoice_date ASC`;
+    const invRes = await pool.query(invoiceQuery, params);
+    const invoices = invRes.rows;
+
+    const opening_balance = parseFloat(customer.opening_balance) || 0;
+    let running_balance = opening_balance;
+    const transactions = invoices.map(inv => {
+      const amt = parseFloat(inv.total_amount) || 0;
+      running_balance += amt;
+      return {
+        date: inv.invoice_date,
+        type: "Invoice",
+        reference: inv.invoice_number,
+        debit: amt,
+        credit: 0,
+        balance: running_balance
+      };
+    });
+
+    res.json({
+      customer,
+      opening_balance,
+      closing_balance: running_balance,
+      transactions
+    });
   } catch (err) {
-    console.error("GET ACTIVITY LOG ERROR:", err);
+    console.error("GET CUSTOMER STATEMENT ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -121,5 +475,6 @@ module.exports = {
   createCustomer,
   updateCustomer,
   deleteCustomer,
-  getActivityLog
+  getActivityLog,
+  getCustomerStatement,
 };

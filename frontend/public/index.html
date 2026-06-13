@@ -1,56 +1,60 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tinplate Accounting</title>
-    <script src="http://localhost:8097"></script>
-  </head>
-  <body>
-    <!-- ===== ResizeObserver loop suppression (must run first) ===== -->
-    <script>
-      (function() {
-        // 1. Patch ResizeObserver to defer callbacks
-        var NativeRO = window.ResizeObserver;
-        window.ResizeObserver = function(callback) {
-          return new NativeRO(function(entries, observer) {
-            try {
-              window.requestAnimationFrame(function() {
-                callback(entries, observer);
-              });
-            } catch(e) {}
-          });
-        };
 
-        // 2. Capture-phase error listener
-        window.addEventListener('error', function(e) {
-          if (e.message && e.message.indexOf('ResizeObserver loop') !== -1) {
-            e.stopImmediatePropagation();
-            e.preventDefault();
-          }
-        }, true);
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Eazzio-Books</title>
 
-        // 3. Block unhandledrejection
-        window.addEventListener('unhandledrejection', function(e) {
-          if (e.reason && e.reason.message && e.reason.message.indexOf('ResizeObserver loop') !== -1) {
-            e.stopImmediatePropagation();
-            e.preventDefault();
-          }
-        }, true);
+  <script src="http://localhost:8097"></script>
+</head>
 
-        // 4. Swallow console.error for ResizeObserver
-        var consoleError = console.error;
-        console.error = function() {
-          if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('ResizeObserver loop') !== -1) {
-            return;
-          }
-          consoleError.apply(console, arguments);
-        };
-      })();
-    </script>
-    <!-- ============================================================= -->
+<body>
+  <!-- ===== ResizeObserver loop suppression (must run first) ===== -->
+  <script>
+    (function () {
+      // 1. Patch ResizeObserver to defer callbacks
+      var NativeRO = window.ResizeObserver;
+      window.ResizeObserver = function (callback) {
+        return new NativeRO(function (entries, observer) {
+          try {
+            window.requestAnimationFrame(function () {
+              callback(entries, observer);
+            });
+          } catch (e) { }
+        });
+      };
 
-    <div id="root"></div>
-  </body>
+      // 2. Capture-phase error listener
+      window.addEventListener('error', function (e) {
+        if (e.message && e.message.indexOf('ResizeObserver loop') !== -1) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+
+      // 3. Block unhandledrejection
+      window.addEventListener('unhandledrejection', function (e) {
+        if (e.reason && e.reason.message && e.reason.message.indexOf('ResizeObserver loop') !== -1) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      }, true);
+
+      // 4. Swallow console.error for ResizeObserver
+      var consoleError = console.error;
+      console.error = function () {
+        if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('ResizeObserver loop') !== -1) {
+          return;
+        }
+        consoleError.apply(console, arguments);
+      };
+    })();
+  </script>
+  <!-- ============================================================= -->
+
+  <div id="root"></div>
+</body>
+
 </html>

@@ -1,20 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiRequest } from "./api";
+import { TableSkeleton } from "./components/skeletons";
 import toast from "react-hot-toast";
 
 function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Inline add form
-  const [showForm, setShowForm] = useState(false);
-  const [vendorId, setVendorId] = useState("");
-  const [category, setCategory] = useState("Other Expenses");
-  const [amount, setAmount] = useState("");
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
-  const [description, setDescription] = useState("");
-  const [reference, setReference] = useState("");
+  const navigate = useNavigate();
 
   const fetchExpenses = useCallback(async () => {
     try {
@@ -27,34 +23,19 @@ function Expenses() {
   useEffect(() => { fetchExpenses(); }, [fetchExpenses]);
 
   useEffect(() => {
-    const fetchVendors = async () => {
+    const fetchVendorsAndProjects = async () => {
       try {
-        const res = await apiRequest("/contacts?type=vendor");
-        setVendors(res?.contacts || []);
+        const [venRes, projRes] = await Promise.all([
+          apiRequest("/vendors"),
+          apiRequest("/projects")
+        ]);
+        setVendors(venRes?.vendors || []);
+        setProjects(projRes?.projects || []);
       } catch (err) { /* ignore */ }
     };
-    fetchVendors();
+    fetchVendorsAndProjects();
   }, []);
 
-  const addExpense = async () => {
-    if (!amount) return toast.error("Enter amount");
-    try {
-      await apiRequest("/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          vendor_id: vendorId || null,
-          category,
-          amount: parseFloat(amount),
-          expense_date: expenseDate,
-          description,
-          reference,
-        }),
-      });
-      toast.success("Expense added");
-      setShowForm(false); setAmount(""); setDescription(""); setReference("");
-      fetchExpenses();
-    } catch (err) { toast.error("Failed to add expense"); }
-  };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete?")) return;
@@ -69,33 +50,10 @@ function Expenses() {
     <div style={{ padding: "30px", maxWidth: "1000px", margin: "auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
         <h2>Expenses</h2>
-        <button onClick={() => setShowForm(true)} style={primaryBtn}>+ New Expense</button>
+        <button onClick={() => navigate("/expenses/new")} style={primaryBtn}>+ New Expense</button>
       </div>
 
-      {/* Inline Add Form */}
-      {showForm && (
-        <div style={{ background: "#f0f4ff", padding: "15px", borderRadius: "8px", marginBottom: "20px" }}>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "10px" }}>
-            <select value={vendorId} onChange={e => setVendorId(e.target.value)} style={inputStyle}>
-              <option value="">Select Vendor</option>
-              {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-            <select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>
-              <option>Other Expenses</option><option>Travel</option><option>Meals</option><option>Office Supplies</option><option>Rent</option><option>Utilities</option>
-            </select>
-            <input type="number" placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} style={{ ...inputStyle, width: "120px" }} />
-            <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} style={{ ...inputStyle, width: "150px" }} />
-          </div>
-          <input type="text" placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} style={{ ...inputStyle, marginBottom: "10px" }} />
-          <input type="text" placeholder="Reference / Bill #" value={reference} onChange={e => setReference(e.target.value)} style={{ ...inputStyle, marginBottom: "10px" }} />
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={addExpense} style={primaryBtn}>Save</button>
-            <button onClick={() => setShowForm(false)} style={cancelBtnStyle}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {loading ? <p>Loading...</p> : expenses.length === 0 ? (
+      {loading ? <TableSkeleton columns={6} rows={5} /> : expenses.length === 0 ? (
         <p>No expenses yet.</p>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>

@@ -1,5 +1,53 @@
 /* index.css – minimal base (Inter font loaded in styles.css) */
+/* Global CSS Variables for Light/Dark Theme */
+:root {
+  /* Layout */
+  --bg-global: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  --bg-input: #ffffff;
+  
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  
+  /* Borders */
+  --border-color: #e2e8f0;
+  --border-color-hover: #cbd5e1;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='dark'] {
+  /* Layout */
+  --bg-global: #0f172a;       /* Slate 900 */
+  --bg-card: #1e293b;         /* Slate 800 */
+  --bg-hover: #334155;        /* Slate 700 */
+  --bg-input: #0f172a;
+  
+  /* Text */
+  --text-primary: #f8fafc;    /* Slate 50 */
+  --text-secondary: #cbd5e1;  /* Slate 300 */
+  --text-muted: #94a3b8;      /* Slate 400 */
+  
+  /* Borders */
+  --border-color: #334155;    /* Slate 700 */
+  --border-color-hover: #475569;
+
+  /* Shadows (Less intense on dark mode) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.7);
+}
+
+/* Base Body Styles */
 body {
+  background-color: var(--bg-global);
+  color: var(--text-primary);
   margin: 0;
   font-family: 'Inter', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
@@ -9,4 +57,45 @@ body {
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@media print {
+  /* Hide application UI elements */
+  .sidebar, .topbar, .app-sidebar, header.topbar, nav, .print-hide {
+    display: none !important;
+  }
+  
+  /* Reset layout margins for full page print */
+  body, main, .main-content, #root, .app-layout, .app-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    background: white !important;
+  }
+
+  /* Convert inputs and textareas to look like plain text */
+  input, textarea, select {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    resize: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #000 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+  }
+  
+  /* Hide labels if they are meant for editable forms but redundant in print */
+  .print-label {
+    display: none !important;
+  }
+
+  /* Ensure background colors in tables print properly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
